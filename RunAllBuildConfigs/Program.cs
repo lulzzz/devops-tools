@@ -77,6 +77,11 @@ BuildDebug");
                 Log(build);
             }
 
+            Dictionary<string, string> tcvariables = GetTeamcityBuildVariables();
+            string me = tcvariables["teamcity.buildType.id"];
+            Log($"Removing '{me}'");
+            builds.Remove(me);
+
             TriggerBuilds(server, username, password, builds);
         }
 
