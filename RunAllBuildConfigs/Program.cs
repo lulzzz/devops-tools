@@ -18,7 +18,7 @@ namespace RunAllBuildConfigs
             if (args.Length != 0)
             {
                 Console.WriteLine(
-    @"RunAllBuildConfigs 0.001 - Trigger all builds.
+@"RunAllBuildConfigs 0.002 - Trigger all builds.
 
 Usage: RunAllBuildConfigs.exe
 
@@ -78,9 +78,12 @@ BuildDebug");
             }
 
             Dictionary<string, string> tcvariables = GetTeamcityBuildVariables();
-            string me = tcvariables["teamcity.buildType.id"];
-            Log($"Removing '{me}'");
-            builds.Remove(me);
+            if (tcvariables.ContainsKey("teamcity.buildType.id"))
+            {
+                string me = tcvariables["teamcity.buildType.id"];
+                Log($"Removing '{me}'");
+                builds.Remove(me);
+            }
 
             TriggerBuilds(server, username, password, builds);
         }
