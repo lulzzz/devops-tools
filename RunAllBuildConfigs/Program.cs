@@ -131,8 +131,8 @@ BuildDebug");
             {
                 if (username != null && password != null)
                 {
-                    string credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes(username + ":" + password));
-                    client.Headers[HttpRequestHeader.Authorization] = "Basic " + credentials;
+                    string credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}"));
+                    client.Headers[HttpRequestHeader.Authorization] = $"Basic {credentials}";
                 }
 
                 string address = $"{server}/app/rest/buildTypes";
@@ -178,7 +178,7 @@ BuildDebug");
             }
             catch (WebException ex)
             {
-                throw new ApplicationException(ex.Message);
+                throw new ApplicationException(ex.Message, ex);
             }
         }
 
@@ -190,8 +190,8 @@ BuildDebug");
             {
                 if (username != null && password != null)
                 {
-                    string credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes(username + ":" + password));
-                    client.Headers[HttpRequestHeader.Authorization] = "Basic " + credentials;
+                    string credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}"));
+                    client.Headers[HttpRequestHeader.Authorization] = $"Basic {credentials}";
                 }
 
                 foreach (string buildid in buildids)
@@ -223,7 +223,7 @@ BuildDebug");
             }
             catch (WebException ex)
             {
-                throw new ApplicationException(ex.Message);
+                throw new ApplicationException(ex.Message, ex);
             }
         }
 
