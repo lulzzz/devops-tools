@@ -29,6 +29,7 @@ BuildPassword
 TEAMCITY_BUILD_PROPERTIES_FILE (can retrieve the 3 above: Server, Username, Password)
 
 Optional environment variables:
+BuildExcludeBuildConfigs
 BuildDebug");
                 result = 1;
             }
@@ -77,12 +78,37 @@ BuildDebug");
                 Log(build);
             }
 
+            string[] excludedBuildConfigs = GetExcludedBuildConfigs();
+
             Dictionary<string, string> tcvariables = GetTeamcityBuildVariables();
             if (tcvariables.ContainsKey("teamcity.buildType.id"))
             {
-                string me = tcvariables["teamcity.buildType.id"];
-                Log($"Removing '{me}'");
-                builds.Remove(me);
+                string buildConfig = tcvariables["teamcity.buildType.id"];
+                if (builds.Contains(buildConfig))
+                {
+                    Log($"Excluding build config (me): '{buildConfig}'");
+                    builds.Remove(buildConfig);
+                }
+                else
+                {
+                    LogColor($"Couldn't exclude build config: '{buildConfig}'", ConsoleColor.Yellow);
+                }
+            }
+
+            if (excludedBuildConfigs != null)
+            {
+                foreach (string buildConfig in excludedBuildConfigs)
+                {
+                    if (builds.Contains(buildConfig))
+                    {
+                        Log($"Excluding build config: '{buildConfig}'");
+                        builds.Remove(buildConfig);
+                    }
+                    else
+                    {
+                        LogColor($"Couldn't exclude build config: '{buildConfig}'", ConsoleColor.Yellow);
+                    }
+                }
             }
 
             TriggerBuilds(server, username, password, builds);
@@ -180,6 +206,23 @@ BuildDebug");
             {
                 throw new ApplicationException(ex.Message, ex);
             }
+        }
+
+        static string[] GetExcludedBuildConfigs()
+        {
+            string excludedBuildConfigs = Environment.GetEnvironmentVariable("BuildExcludeBuildConfigs");
+
+            if (excludedBuildConfigs != null)
+            {
+                Log($"Got excluded build configs from environment variable: '{excludedBuildConfigs}'");
+                return excludedBuildConfigs.Split(',');
+            }
+            else
+            {
+                Log("No excluded build configs specified.");
+            }
+
+            return null;
         }
 
         static void TriggerBuilds(string server, string username, string password, List<string> buildids)
