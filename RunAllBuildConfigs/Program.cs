@@ -30,6 +30,7 @@ TEAMCITY_BUILD_PROPERTIES_FILE (can retrieve the 3 above: Server, Username, Pass
 
 Optional environment variables:
 BuildExcludeBuildConfigs
+BuildSortedExecution
 BuildDebug");
                 result = 1;
             }
@@ -72,13 +73,19 @@ BuildDebug");
 
             Log($"Found {builds.Count} build configs.");
 
+            bool sortedExecution = GetSortedExecution();
+            string[] excludedBuildConfigs = GetExcludedBuildConfigs();
+
+            if (sortedExecution)
+            {
+                builds.Sort(StringComparer.OrdinalIgnoreCase);
+            }
 
             foreach (string build in builds)
             {
                 Log(build);
             }
 
-            string[] excludedBuildConfigs = GetExcludedBuildConfigs();
 
             Dictionary<string, string> tcvariables = GetTeamcityBuildVariables();
             if (tcvariables.ContainsKey("teamcity.buildType.id"))
@@ -206,6 +213,22 @@ BuildDebug");
             {
                 throw new ApplicationException(ex.Message, ex);
             }
+        }
+
+        static bool GetSortedExecution()
+        {
+            string sortedExecution = Environment.GetEnvironmentVariable("BuildSortedExecution");
+
+            if (sortedExecution != null)
+            {
+                Log($"Got sorted execution flag from environment variable: '{sortedExecution}'");
+            }
+            else
+            {
+                Log("No sorted execution flag specified.");
+            }
+
+            return !string.IsNullOrEmpty(sortedExecution);
         }
 
         static string[] GetExcludedBuildConfigs()
