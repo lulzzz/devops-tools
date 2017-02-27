@@ -100,6 +100,24 @@ BuildDebug");
 
             PrintBuildSteps(builds);
 
+            if (excludedBuildStepTypes != null && excludedBuildStepTypes.Length > 0)
+            {
+                var excludes = builds
+                    .Where(b => b.steps.Any(s => (!s.disabled.HasValue || !s.disabled.Value) && excludedBuildStepTypes.Any(ss => ss == s.steptype)))
+                    .ToArray();
+                Log($"Excluding {excludes.Length} build configs (steptype).");
+                foreach (var build in excludes)
+                {
+                    List<string> excludesteps = build.steps
+                        .Where(s => (!s.disabled.HasValue || !s.disabled.Value) && excludedBuildStepTypes.Any(ss => ss == s.steptype))
+                        .Select(s => $"{s.stepname}|{s.steptype}")
+                        .ToList();
+                    string reason = string.Join(", ", excludesteps);
+                    Log($"Excluding build config: '{build.buildid}' ({reason})");
+                    builds.Remove(build);
+                }
+            }
+
 
             Dictionary<string, string> tcvariables = GetTeamcityBuildVariables();
             if (tcvariables.ContainsKey("teamcity.buildType.id"))
@@ -139,6 +157,8 @@ BuildDebug");
                     }
                 }
             }
+
+            LogColor($"Triggering {builds.Count} build configs...", ConsoleColor.Green);
 
             TriggerBuilds(server, username, password, builds, dryRun);
         }
@@ -343,7 +363,7 @@ BuildDebug");
 
         static string[] GetExcludedBuildStepTypes()
         {
-            string excludedBuildStepTypes = Environment.GetEnvironmentVariable("BuildExcludedBuildStepTypes");
+            string excludedBuildStepTypes = Environment.GetEnvironmentVariable("BuildExcludeBuildStepTypes");
 
             if (excludedBuildStepTypes != null)
             {
