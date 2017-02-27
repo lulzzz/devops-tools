@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,13 +13,26 @@ namespace RunAllBuildConfigs
 {
     class Program
     {
+        class Buildstep
+        {
+            public string stepname { get; set; }
+            public string steptype { get; set; }
+            public bool? disabled { get; set; }
+        }
+
+        class Build
+        {
+            public string buildid { get; set; }
+            public List<Buildstep> steps { get; set; }
+        }
+
         static int Main(string[] args)
         {
             int result = 0;
             if (args.Length != 0)
             {
                 Console.WriteLine(
-@"RunAllBuildConfigs 0.002 - Trigger all builds.
+@"RunAllBuildConfigs 0.003 - Trigger all builds.
 
 Usage: RunAllBuildConfigs.exe
 
@@ -29,7 +43,9 @@ BuildPassword
 TEAMCITY_BUILD_PROPERTIES_FILE (can retrieve the 3 above: Server, Username, Password)
 
 Optional environment variables:
+BuildDryRun
 BuildExcludeBuildConfigs
+BuildExcludeBuildStepTypes
 BuildSortedExecution
 BuildDebug");
                 result = 1;
@@ -64,41 +80,43 @@ BuildDebug");
         static void TriggerMeEasy()
         {
             string server = GetServer();
+            bool dryRun = GetDryRun();
+            string[] excludedBuildConfigs = GetExcludedBuildConfigs();
+            string[] excludedBuildStepTypes = GetExcludedBuildStepTypes();
+            bool sortedExecution = GetSortedExecution();
 
             string username, password;
             GetCredentials(out username, out password);
 
-
-            List<string> builds = GetBuildConfigs(server, username, password);
+            List<Build> builds = GetBuildConfigs(server, username, password);
 
             Log($"Found {builds.Count} build configs.");
 
-            bool sortedExecution = GetSortedExecution();
-            string[] excludedBuildConfigs = GetExcludedBuildConfigs();
-
             if (sortedExecution)
             {
-                builds.Sort(StringComparer.OrdinalIgnoreCase);
+                builds = builds.OrderBy(b => b.buildid, StringComparer.OrdinalIgnoreCase).ToList();
             }
 
-            foreach (string build in builds)
-            {
-                Log(build);
-            }
+
+            PrintBuildSteps(builds);
 
 
             Dictionary<string, string> tcvariables = GetTeamcityBuildVariables();
             if (tcvariables.ContainsKey("teamcity.buildType.id"))
             {
                 string buildConfig = tcvariables["teamcity.buildType.id"];
-                if (builds.Contains(buildConfig))
+                Build[] excludes = builds.Where(b => b.buildid.Equals(buildConfig, StringComparison.OrdinalIgnoreCase)).ToArray();
+                if (excludes.Length > 0)
                 {
-                    Log($"Excluding build config (me): '{buildConfig}'");
-                    builds.Remove(buildConfig);
+                    foreach (Build build in excludes)
+                    {
+                        Log($"Excluding build config (me): '{build.buildid}'");
+                        builds.Remove(build);
+                    }
                 }
                 else
                 {
-                    LogColor($"Couldn't exclude build config: '{buildConfig}'", ConsoleColor.Yellow);
+                    LogColor($"Couldn't exclude build config (me): '{buildConfig}'", ConsoleColor.Yellow);
                 }
             }
 
@@ -106,10 +124,14 @@ BuildDebug");
             {
                 foreach (string buildConfig in excludedBuildConfigs)
                 {
-                    if (builds.Contains(buildConfig))
+                    Build[] excludes = builds.Where(b => b.buildid.Equals(buildConfig, StringComparison.OrdinalIgnoreCase)).ToArray();
+                    if (excludes.Length > 0)
                     {
-                        Log($"Excluding build config: '{buildConfig}'");
-                        builds.Remove(buildConfig);
+                        foreach (Build build in excludes)
+                        {
+                            Log($"Excluding build config: '{build.buildid}'");
+                            builds.Remove(build);
+                        }
                     }
                     else
                     {
@@ -118,7 +140,7 @@ BuildDebug");
                 }
             }
 
-            TriggerBuilds(server, username, password, builds);
+            TriggerBuilds(server, username, password, builds, dryRun);
         }
 
         static string GetServer()
@@ -156,9 +178,9 @@ BuildDebug");
             return server;
         }
 
-        static List<string> GetBuildConfigs(string server, string username, string password)
+        static List<Build> GetBuildConfigs(string server, string username, string password)
         {
-            List<string> buildids = new List<string>();
+            List<Build> buildConfigs = new List<Build>();
 
             using (WebClient client = new WebClient())
             {
@@ -171,23 +193,93 @@ BuildDebug");
                 string address = $"{server}/app/rest/buildTypes";
                 client.Headers["Accept"] = "application/json";
 
-                dynamic builds = DownloadJsonContent(client, address, "BuildDebug1.txt");
+                dynamic builds = DownloadJsonContent(client, address, "BuildDebug1.json");
 
-                foreach (JProperty property in builds)
+                foreach (JProperty propertyBuild in builds)
                 {
-                    if (property.First.Type == JTokenType.Array)
+                    if (propertyBuild.First.Type == JTokenType.Array)
                     {
-                        foreach (dynamic build in property.First)
+                        foreach (dynamic build in propertyBuild.First)
                         {
                             string buildid = build.id;
 
-                            buildids.Add(buildid);
+                            address = $"{server}/app/rest/buildTypes/{buildid}";
+                            client.Headers["Accept"] = "application/json";
+
+                            dynamic buildConfig = DownloadJsonContent(client, address, "BuildDebug2.json");
+
+                            List<Buildstep> buildsteps = new List<Buildstep>();
+
+                            foreach (JProperty propertyStep in buildConfig.steps)
+                            {
+                                if (propertyStep.First.Type == JTokenType.Array)
+                                {
+                                    foreach (dynamic step in propertyStep.First)
+                                    {
+                                        buildsteps.Add(new Buildstep
+                                        {
+                                            stepname = step.name,
+                                            steptype = step.type,
+                                            disabled = step.disabled
+                                        });
+                                    }
+                                }
+                            }
+
+                            buildConfigs.Add(new Build
+                            {
+                                buildid = buildid,
+                                steps = buildsteps
+                            });
                         }
                     }
                 }
             }
 
-            return buildids;
+            return buildConfigs;
+        }
+
+        static void PrintBuildSteps(List<Build> builds)
+        {
+            foreach (Build build in builds)
+            {
+                Log($"{build.buildid}");
+                //Log($"{build.buildid}: {string.Join(",", build.steps.Select(s => $"{s.stepname}|{s.steptype}"))}");
+                foreach (Buildstep step in build.steps)
+                {
+                    string disabled = step.disabled.HasValue && step.disabled.Value ? "Disabled" : "Enabled";
+                    Log($"    {step.stepname}|{step.steptype}|{disabled}");
+                }
+            }
+
+            var allsteps = builds.SelectMany(b => b.steps)
+                .ToArray();
+
+            Log($"Found {allsteps.Count(s => !s.disabled.HasValue || !s.disabled.Value)} (of {allsteps.Length}) enabled build steps.");
+
+
+            var steptypes = allsteps
+                .Where(t => !t.disabled.HasValue || !t.disabled.Value)
+                .GroupBy(s => s.steptype)
+                .ToArray();
+
+            Log($"Found {steptypes.Length} enabled build step types.");
+
+            foreach (var steptype in steptypes.OrderBy(t => -t.Count()))
+            {
+                List<string> refs = builds
+                    .Where(b => b.steps.Any(s => s.steptype == steptype.Key && (!s.disabled.HasValue || !s.disabled.Value)))
+                    .SelectMany(b => b.steps
+                        .Where(s => s.steptype == steptype.Key && (!s.disabled.HasValue || !s.disabled.Value))
+                        .Select(s => $"'{b.buildid}.{s.stepname}'"))
+                    .Take(3)
+                    .ToList();
+                if (refs.Count == 3)
+                {
+                    refs[2] = "...";
+                }
+                Log($" {steptype.Key}: {steptype.Count()}: {string.Join(", ", refs)}");
+            }
         }
 
         static Dictionary<string, bool> writtenLogs = new Dictionary<string, bool>();
@@ -198,11 +290,12 @@ BuildDebug");
             try
             {
                 string content = client.DownloadString(address);
-                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BuildDebug")))
+                if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BuildDebug")))
                 {
                     if (!writtenLogs.ContainsKey(debugFilename))
                     {
-                        File.WriteAllText(debugFilename, content);
+                        string pretty = JToken.Parse(content).ToString(Formatting.Indented);
+                        File.WriteAllText(debugFilename, pretty);
                         writtenLogs[debugFilename] = true;
                     }
                 }
@@ -215,20 +308,20 @@ BuildDebug");
             }
         }
 
-        static bool GetSortedExecution()
+        static bool GetDryRun()
         {
-            string sortedExecution = Environment.GetEnvironmentVariable("BuildSortedExecution");
+            string dryRun = Environment.GetEnvironmentVariable("BuildDryRun");
 
-            if (sortedExecution != null)
+            if (dryRun != null)
             {
-                Log($"Got sorted execution flag from environment variable: '{sortedExecution}'");
+                Log($"Got dry run flag from environment variable: '{dryRun}'");
             }
             else
             {
-                Log("No sorted execution flag specified.");
+                Log("No dry run flag specified.");
             }
 
-            return !string.IsNullOrEmpty(sortedExecution);
+            return !string.IsNullOrEmpty(dryRun);
         }
 
         static string[] GetExcludedBuildConfigs()
@@ -248,7 +341,40 @@ BuildDebug");
             return null;
         }
 
-        static void TriggerBuilds(string server, string username, string password, List<string> buildids)
+        static string[] GetExcludedBuildStepTypes()
+        {
+            string excludedBuildStepTypes = Environment.GetEnvironmentVariable("BuildExcludedBuildStepTypes");
+
+            if (excludedBuildStepTypes != null)
+            {
+                Log($"Got excluded build step types from environment variable: '{excludedBuildStepTypes}'");
+                return excludedBuildStepTypes.Split(',');
+            }
+            else
+            {
+                Log("No excluded build step types specified.");
+            }
+
+            return null;
+        }
+
+        static bool GetSortedExecution()
+        {
+            string sortedExecution = Environment.GetEnvironmentVariable("BuildSortedExecution");
+
+            if (sortedExecution != null)
+            {
+                Log($"Got sorted execution flag from environment variable: '{sortedExecution}'");
+            }
+            else
+            {
+                Log("No sorted execution flag specified.");
+            }
+
+            return !string.IsNullOrEmpty(sortedExecution);
+        }
+
+        static void TriggerBuilds(string server, string username, string password, List<Build> builds, bool dryRun)
         {
             List<string> buildnames = new List<string>();
 
@@ -260,24 +386,34 @@ BuildDebug");
                     client.Headers[HttpRequestHeader.Authorization] = $"Basic {credentials}";
                 }
 
-                foreach (string buildid in buildids)
+                foreach (Build build in builds)
                 {
-                    string content = $"<build><buildType id='{buildid}'/></build>";
+                    string content = $"<build><buildType id='{build.buildid}'/></build>";
 
                     string address = $"{server}/app/rest/buildQueue";
                     client.Headers["Content-Type"] = "application/xml";
 
-                    PostXmlContent(client, address, content, "BuildDebug2.txt");
+                    PostXmlContent(client, address, content, "BuildDebug3.json", dryRun);
                 }
             }
         }
 
-        static void PostXmlContent(WebClient client, string address, string content, string debugFilename)
+        static void PostXmlContent(WebClient client, string address, string content, string debugFilename, bool dryRun)
         {
-            Log($"Address: '{address}', content: '{content}'");
+            if (dryRun)
+            {
+                Log($"Address: '{address}', content: '{content}', dryRun: {dryRun}");
+            }
+            else
+            {
+                Log($"Address: '{address}', content: '{content}'");
+            }
             try
             {
-                string result = client.UploadString(address, content);
+                if (!dryRun)
+                {
+                    string result = client.UploadString(address, content);
+                }
                 if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BuildDebug")))
                 {
                     if (!writtenLogs.ContainsKey(debugFilename))
