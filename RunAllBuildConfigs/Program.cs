@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -12,6 +14,17 @@ using System.Threading.Tasks;
 
 namespace RunAllBuildConfigs
 {
+    public class ApplicationException : Exception
+    {
+        public ApplicationException(string message) : base(message)
+        {
+        }
+
+        public ApplicationException(string message, Exception ex) : base(message, ex)
+        {
+        }
+    }
+
     class Program
     {
         class Buildstep
@@ -39,7 +52,7 @@ namespace RunAllBuildConfigs
             if (args.Length != 0)
             {
                 Console.WriteLine(
-@"RunAllBuildConfigs 0.004 - Trigger all builds.
+@"RunAllBuildConfigs 0.005 - Trigger all builds.
 
 Usage: RunAllBuildConfigs.exe
 
@@ -78,7 +91,7 @@ BuildVerbose");
                 }
             }
 
-            if (Environment.UserInteractive)
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("UserInteractive")))
             {
                 Console.WriteLine("Press any key to continue...");
                 Console.ReadKey();
@@ -289,12 +302,12 @@ BuildVerbose");
         {
             List<Build> buildConfigs = new List<Build>();
 
-            using (WebClient client = new WebClient())
+            using (HttpClient client = new HttpClient())
             {
                 if (username != null && password != null)
                 {
                     string credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}"));
-                    client.Headers[HttpRequestHeader.Authorization] = $"Basic {credentials}";
+                    client.DefaultRequestHeaders.Add("Authorization", $"Basic {credentials}");
                 }
 
                 string address = $"{server}/app/rest/buildTypes";
@@ -476,12 +489,12 @@ BuildVerbose");
         {
             List<string> buildnames = new List<string>();
 
-            using (WebClient client = new WebClient())
+            using (HttpClient client = new HttpClient())
             {
                 if (username != null && password != null)
                 {
                     string credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}"));
-                    client.Headers[HttpRequestHeader.Authorization] = $"Basic {credentials}";
+                    client.DefaultRequestHeaders.Add("Authorization", $"Basic {credentials}");
                 }
 
                 foreach (Build build in builds)
@@ -533,10 +546,10 @@ BuildVerbose");
             }
         }
 
-        static string PutPlainTextContent(WebClient client, string address, string content, string debugFilename, bool dryRun)
+        static string PutPlainTextContent(HttpClient client, string address, string content, string debugFilename, bool dryRun)
         {
-            client.Headers["Content-Type"] = "text/plain";
-            client.Headers["Accept"] = "text/plain";
+            client.DefaultRequestHeaders.Add("Content-Type", "text/plain");
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("text/plain"));
             Log($"Address: '{address}', content: '{content}'" + (dryRun ? $", dryRun: {dryRun}" : string.Empty));
             try
             {
@@ -552,7 +565,7 @@ BuildVerbose");
                 string result = null;
                 if (!dryRun)
                 {
-                    result = client.UploadString(address, "PUT", content);
+                    result = client.PutAsync(address, new StringContent(content)).Result.Content.ReadAsStringAsync().Result;
                 }
                 if (_buildDebug)
                 {
@@ -578,13 +591,13 @@ BuildVerbose");
             }
         }
 
-        static JObject GetJsonContent(WebClient client, string address, string debugFilename)
+        static JObject GetJsonContent(HttpClient client, string address, string debugFilename)
         {
-            client.Headers["Accept"] = "application/json";
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
             Log($"Address: '{address}'");
             try
             {
-                string result = client.DownloadString(address);
+                string result = client.GetAsync(address).Result.Content.ReadAsStringAsync().Result;
                 if (_buildDebug)
                 {
                     string resultfile = $"{debugFilename}.result.json";
@@ -604,10 +617,10 @@ BuildVerbose");
             }
         }
 
-        static JObject PutJsonContent(WebClient client, string address, JObject content, string debugFilename, bool dryRun)
+        static JObject PutJsonContent(HttpClient client, string address, JObject content, string debugFilename, bool dryRun)
         {
-            client.Headers["Content-Type"] = "application/json";
-            client.Headers["Accept"] = "application/json";
+            client.DefaultRequestHeaders.Add("Content-Type", "application/json");
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             Log($"Address: '{address}', content: '{content}'" + (dryRun ? $", dryRun: {dryRun}" : string.Empty));
             try
             {
@@ -624,7 +637,7 @@ BuildVerbose");
                 string result = null;
                 if (!dryRun)
                 {
-                    result = client.UploadString(address, "PUT", content.ToString());
+                    result = client.PutAsync(address, new StringContent(content.ToString())).Result.Content.ReadAsStringAsync().Result;
                 }
                 if (_buildDebug)
                 {
@@ -659,10 +672,10 @@ BuildVerbose");
             }
         }
 
-        static JObject PostXmlContent(WebClient client, string address, string content, string debugFilename, bool dryRun)
+        static JObject PostXmlContent(HttpClient client, string address, string content, string debugFilename, bool dryRun)
         {
-            client.Headers["Content-Type"] = "application/xml";
-            client.Headers["Accept"] = "application/json";
+            client.DefaultRequestHeaders.Add("Content-Type", "application/xml");
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             Log($"Address: '{address}', content: '{content}'" + (dryRun ? $", dryRun: {dryRun}" : string.Empty));
             try
             {
@@ -678,7 +691,7 @@ BuildVerbose");
                 string result = null;
                 if (!dryRun)
                 {
-                    result = client.UploadString(address, content);
+                    result = client.PostAsync(address, new StringContent(content)).Result.Content.ReadAsStringAsync().Result;
                 }
                 if (_buildDebug)
                 {
