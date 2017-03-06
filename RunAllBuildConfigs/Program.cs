@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace RunAllBuildConfigs
@@ -15,16 +16,22 @@ namespace RunAllBuildConfigs
     {
         class Buildstep
         {
+            public string stepid { get; set; }
             public string stepname { get; set; }
             public string steptype { get; set; }
             public bool? disabled { get; set; }
+            public bool disable { get; set; }
         }
 
         class Build
         {
             public string buildid { get; set; }
             public List<Buildstep> steps { get; set; }
+            public bool DontRun { get; set; }
         }
+
+        static bool _buildDebug;
+        static Dictionary<string, bool> _writtenLogs = new Dictionary<string, bool>();
 
         static int Main(string[] args)
         {
@@ -32,7 +39,7 @@ namespace RunAllBuildConfigs
             if (args.Length != 0)
             {
                 Console.WriteLine(
-@"RunAllBuildConfigs 0.003 - Trigger all builds.
+@"RunAllBuildConfigs 0.004 - Trigger all builds.
 
 Usage: RunAllBuildConfigs.exe
 
@@ -43,11 +50,14 @@ BuildPassword
 TEAMCITY_BUILD_PROPERTIES_FILE (can retrieve the 3 above: Server, Username, Password)
 
 Optional environment variables:
+BuildDisableBuildSteps
+BuildDisableBuildStepTypes
 BuildDryRun
 BuildExcludeBuildConfigs
 BuildExcludeBuildStepTypes
 BuildSortedExecution
-BuildDebug");
+BuildDebug
+BuildVerbose");
                 result = 1;
             }
             else
@@ -79,27 +89,75 @@ BuildDebug");
 
         static void TriggerMeEasy()
         {
+            _buildDebug = GetBooleanEnvironmentVariable("BuildDebug", false);
+
+            bool dryRun = GetBooleanEnvironmentVariable("BuildDryRun", false);
+            bool sortedExecution = GetBooleanEnvironmentVariable("BuildSortedExecution", true);
+            bool verbose = GetBooleanEnvironmentVariable("BuildVerbose", false);
+
             string server = GetServer();
-            bool dryRun = GetDryRun();
-            string[] excludedBuildConfigs = GetExcludedBuildConfigs();
-            string[] excludedBuildStepTypes = GetExcludedBuildStepTypes();
-            bool sortedExecution = GetSortedExecution();
 
             string username, password;
             GetCredentials(out username, out password);
 
-            List<Build> builds = GetBuildConfigs(server, username, password);
+            string[] disabledBuildSteps = GetStringArrayEnvironmentVariable("BuildDisableBuildSteps", null);
+            string[] disabledBuildStepTypes = GetStringArrayEnvironmentVariable("BuildDisableBuildStepTypes", null);
+            string[] excludedBuildConfigs = GetStringArrayEnvironmentVariable("BuildExcludeBuildConfigs", null);
+            string[] excludedBuildStepTypes = GetStringArrayEnvironmentVariable("BuildExcludeBuildStepTypes", null);
 
-            Log($"Found {builds.Count} build configs.");
+            List<Build> builds = LogTCSection("Retrieving build configs and steps", () =>
+            {
+                return GetBuildConfigs(server, username, password);
+            });
+
+            int totalbuilds = builds.Count;
+            int totalsteps = builds.Sum(b => b.steps.Count);
+            int enabledsteps = builds.Sum(b => b.steps.Count(s => (!s.disabled.HasValue || !s.disabled.Value) && !s.disable));
+
+            LogColor($"Found {totalbuilds} build configs, with {enabledsteps}/{totalsteps} enabled build steps.", ConsoleColor.Green);
 
             if (sortedExecution)
             {
                 builds = builds.OrderBy(b => b.buildid, StringComparer.OrdinalIgnoreCase).ToList();
             }
 
+            ExcludeBuildStepTypes(builds, excludedBuildStepTypes);
 
-            PrintBuildSteps(builds);
+            ExcludeMe(builds);
 
+            ExcludedBuildConfigs(builds, excludedBuildConfigs);
+
+            DisableBuildSteps(builds, disabledBuildSteps);
+
+            DisableBuildStepTypes(builds, disabledBuildStepTypes);
+
+            if (verbose)
+            {
+                LogTCSection("Build configs and steps", () =>
+                {
+                    PrintBuildSteps(builds);
+                });
+            }
+
+
+            int dontrunbuilds = builds.Count(b => b.DontRun);
+            int disablesteps = builds.Sum(b => b.steps.Count(s => s.disable));
+
+            totalbuilds = builds.Count;
+            int enabledbuilds = builds.Count(b => !b.DontRun);
+            totalsteps = builds.Sum(b => b.steps.Count);
+            enabledsteps = builds.Sum(b => b.steps.Count(s => (!s.disabled.HasValue || !s.disabled.Value) && !s.disable));
+
+
+            LogColor($"Excluding {dontrunbuilds} builds configs.", ConsoleColor.Green);
+            LogColor($"Disabling {disablesteps} additional build steps.", ConsoleColor.Green);
+            LogColor($"Triggering {enabledbuilds}/{totalbuilds} build configs, with {enabledsteps}/{totalsteps} enabled build steps...", ConsoleColor.Green);
+
+            TriggerBuilds(server, username, password, builds, dryRun);
+        }
+
+        static void ExcludeBuildStepTypes(List<Build> builds, string[] excludedBuildStepTypes)
+        {
             if (excludedBuildStepTypes != null && excludedBuildStepTypes.Length > 0)
             {
                 var excludes = builds
@@ -114,11 +172,13 @@ BuildDebug");
                         .ToList();
                     string reason = string.Join(", ", excludesteps);
                     Log($"Excluding build config: '{build.buildid}' ({reason})");
-                    builds.Remove(build);
+                    build.DontRun = true;
                 }
             }
+        }
 
-
+        static void ExcludeMe(List<Build> builds)
+        {
             Dictionary<string, string> tcvariables = GetTeamcityBuildVariables();
             if (tcvariables.ContainsKey("teamcity.buildType.id"))
             {
@@ -129,7 +189,7 @@ BuildDebug");
                     foreach (Build build in excludes)
                     {
                         Log($"Excluding build config (me): '{build.buildid}'");
-                        builds.Remove(build);
+                        build.DontRun = true;
                     }
                 }
                 else
@@ -137,7 +197,10 @@ BuildDebug");
                     LogColor($"Couldn't exclude build config (me): '{buildConfig}'", ConsoleColor.Yellow);
                 }
             }
+        }
 
+        static void ExcludedBuildConfigs(List<Build> builds, string[] excludedBuildConfigs)
+        {
             if (excludedBuildConfigs != null)
             {
                 foreach (string buildConfig in excludedBuildConfigs)
@@ -148,7 +211,7 @@ BuildDebug");
                         foreach (Build build in excludes)
                         {
                             Log($"Excluding build config: '{build.buildid}'");
-                            builds.Remove(build);
+                            build.DontRun = true;
                         }
                     }
                     else
@@ -157,10 +220,34 @@ BuildDebug");
                     }
                 }
             }
+        }
 
-            LogColor($"Triggering {builds.Count} build configs...", ConsoleColor.Green);
+        static void DisableBuildSteps(List<Build> builds, string[] disabledBuildSteps)
+        {
+            if (disabledBuildSteps != null)
+            {
+                foreach (Build build in builds)
+                {
+                    foreach (Buildstep buildstep in build.steps.Where(s => (!s.disabled.HasValue || !s.disabled.Value) && disabledBuildSteps.Contains(s.stepid)))
+                    {
+                        buildstep.disable = true;
+                    }
+                }
+            }
+        }
 
-            TriggerBuilds(server, username, password, builds, dryRun);
+        static void DisableBuildStepTypes(List<Build> builds, string[] disabledBuildStepTypes)
+        {
+            if (disabledBuildStepTypes != null)
+            {
+                foreach (Build build in builds)
+                {
+                    foreach (Buildstep buildstep in build.steps.Where(s => (!s.disabled.HasValue || !s.disabled.Value) && disabledBuildStepTypes.Contains(s.steptype)))
+                    {
+                        buildstep.disable = true;
+                    }
+                }
+            }
         }
 
         static string GetServer()
@@ -211,9 +298,8 @@ BuildDebug");
                 }
 
                 string address = $"{server}/app/rest/buildTypes";
-                client.Headers["Accept"] = "application/json";
 
-                dynamic builds = DownloadJsonContent(client, address, "BuildDebug1.json");
+                dynamic builds = GetJsonContent(client, address, "BuildDebug1");
 
                 foreach (JProperty propertyBuild in builds)
                 {
@@ -224,9 +310,8 @@ BuildDebug");
                             string buildid = build.id;
 
                             address = $"{server}/app/rest/buildTypes/{buildid}";
-                            client.Headers["Accept"] = "application/json";
 
-                            dynamic buildConfig = DownloadJsonContent(client, address, "BuildDebug2.json");
+                            dynamic buildConfig = GetJsonContent(client, address, "BuildDebug2");
 
                             List<Buildstep> buildsteps = new List<Buildstep>();
 
@@ -238,9 +323,11 @@ BuildDebug");
                                     {
                                         buildsteps.Add(new Buildstep
                                         {
+                                            stepid = step.id,
                                             stepname = step.name,
                                             steptype = step.type,
-                                            disabled = step.disabled
+                                            disabled = step.disabled,
+                                            disable = false
                                         });
                                     }
                                 }
@@ -249,7 +336,8 @@ BuildDebug");
                             buildConfigs.Add(new Build
                             {
                                 buildid = buildid,
-                                steps = buildsteps
+                                steps = buildsteps,
+                                DontRun = false
                             });
                         }
                     }
@@ -261,21 +349,49 @@ BuildDebug");
 
         static void PrintBuildSteps(List<Build> builds)
         {
+            int[] collengths = {
+                builds.Max(b => b.steps.Max(s => s.stepname.Length)),
+                builds.Max(b => b.steps.Max(s => s.steptype.Length)),
+                builds.Max(b => b.steps.Max(s => s.stepid.Length)),
+                builds.Max(b => b.steps.Max(s => s.disabled.HasValue && s.disabled.Value ? "Disabled".Length : "Enabled".Length)),
+                builds.Max(b => b.steps.Max(s => s.disable? "Disable".Length : "Enable".Length))
+            };
+
             foreach (Build build in builds)
             {
-                Log($"{build.buildid}");
-                //Log($"{build.buildid}: {string.Join(",", build.steps.Select(s => $"{s.stepname}|{s.steptype}"))}");
-                foreach (Buildstep step in build.steps)
+                if (build.DontRun)
                 {
-                    string disabled = step.disabled.HasValue && step.disabled.Value ? "Disabled" : "Enabled";
-                    Log($"    {step.stepname}|{step.steptype}|{disabled}");
+                    LogColor($"{build.buildid}", ConsoleColor.DarkGray);
+                }
+                else
+                {
+                    Log($"{build.buildid}");
+                }
+                //Log($"{build.buildid}: {string.Join(",", build.steps.Select(s => $"{s.stepname}|{s.steptype}"))}");
+                foreach (Buildstep buildstep in build.steps)
+                {
+                    string stepname = $"'{buildstep.stepname.ToString()}'".PadRight(collengths[0] + 2);
+                    string steptype = buildstep.steptype.ToString().PadRight(collengths[1]);
+                    string stepid = buildstep.stepid.ToString().PadRight(collengths[2]);
+
+                    string disabled = buildstep.disabled.HasValue && buildstep.disabled.Value ? "Disabled" : "Enabled";
+                    disabled = disabled.PadRight(collengths[3]);
+                    string disable = buildstep.disable ? "Disable" : "Enable";
+                    disable = disable.PadRight(collengths[4]);
+
+                    if ((buildstep.disabled.HasValue && buildstep.disabled.Value) || buildstep.disable)
+                    {
+                        LogColor($"    {stepname} {steptype} {stepid} {disabled} {disable}", ConsoleColor.DarkGray);
+                    }
+                    else
+                    {
+                        Log($"    {stepname} {steptype} {stepid} {disabled} {disable}");
+                    }
                 }
             }
 
             var allsteps = builds.SelectMany(b => b.steps)
                 .ToArray();
-
-            Log($"Found {allsteps.Count(s => !s.disabled.HasValue || !s.disabled.Value)} (of {allsteps.Length}) enabled build steps.");
 
 
             var steptypes = allsteps
@@ -302,96 +418,58 @@ BuildDebug");
             }
         }
 
-        static Dictionary<string, bool> writtenLogs = new Dictionary<string, bool>();
-
-        static JObject DownloadJsonContent(WebClient client, string address, string debugFilename)
+        static bool GetBooleanEnvironmentVariable(string variableName, bool defaultValue)
         {
-            Log($"Address: '{address}'");
-            try
+            bool returnValue;
+
+            string stringValue = Environment.GetEnvironmentVariable(variableName);
+            if (stringValue == null)
             {
-                string content = client.DownloadString(address);
-                if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BuildDebug")))
+                returnValue = defaultValue;
+                Log($"Environment variable not specified: '{variableName}', using: '{returnValue}'");
+            }
+            else
+            {
+                bool boolValue;
+                if (bool.TryParse(stringValue, out boolValue))
                 {
-                    if (!writtenLogs.ContainsKey(debugFilename))
-                    {
-                        string pretty = JToken.Parse(content).ToString(Formatting.Indented);
-                        File.WriteAllText(debugFilename, pretty);
-                        writtenLogs[debugFilename] = true;
-                    }
+                    returnValue = boolValue;
+                    Log($"Got environment variable: '{variableName}', value: '{returnValue}'");
                 }
-                JObject jobects = JObject.Parse(content);
-                return jobects;
+                else
+                {
+                    returnValue = defaultValue;
+                    Log($"Got malformed environment variable: '{variableName}', using: '{returnValue}'");
+                }
             }
-            catch (WebException ex)
-            {
-                throw new ApplicationException(ex.Message, ex);
-            }
+
+            return returnValue;
         }
 
-        static bool GetDryRun()
+        static string[] GetStringArrayEnvironmentVariable(string variableName, string[] defaultValues)
         {
-            string dryRun = Environment.GetEnvironmentVariable("BuildDryRun");
+            string[] returnValues;
 
-            if (dryRun != null)
+            string stringValue = Environment.GetEnvironmentVariable(variableName);
+            if (stringValue == null)
             {
-                Log($"Got dry run flag from environment variable: '{dryRun}'");
+                returnValues = defaultValues;
+                if (returnValues == null)
+                {
+                    Log($"Environment variable not specified: '{variableName}', using: <null>");
+                }
+                else
+                {
+                    Log($"Environment variable not specified: '{variableName}', using: '{string.Join("', '", returnValues)}'");
+                }
             }
             else
             {
-                Log("No dry run flag specified.");
+                returnValues = stringValue.Split(',');
+                Log($"Got environment variable: '{variableName}', values: '{string.Join("', '", returnValues)}'");
             }
 
-            return !string.IsNullOrEmpty(dryRun);
-        }
-
-        static string[] GetExcludedBuildConfigs()
-        {
-            string excludedBuildConfigs = Environment.GetEnvironmentVariable("BuildExcludeBuildConfigs");
-
-            if (excludedBuildConfigs != null)
-            {
-                Log($"Got excluded build configs from environment variable: '{excludedBuildConfigs}'");
-                return excludedBuildConfigs.Split(',');
-            }
-            else
-            {
-                Log("No excluded build configs specified.");
-            }
-
-            return null;
-        }
-
-        static string[] GetExcludedBuildStepTypes()
-        {
-            string excludedBuildStepTypes = Environment.GetEnvironmentVariable("BuildExcludeBuildStepTypes");
-
-            if (excludedBuildStepTypes != null)
-            {
-                Log($"Got excluded build step types from environment variable: '{excludedBuildStepTypes}'");
-                return excludedBuildStepTypes.Split(',');
-            }
-            else
-            {
-                Log("No excluded build step types specified.");
-            }
-
-            return null;
-        }
-
-        static bool GetSortedExecution()
-        {
-            string sortedExecution = Environment.GetEnvironmentVariable("BuildSortedExecution");
-
-            if (sortedExecution != null)
-            {
-                Log($"Got sorted execution flag from environment variable: '{sortedExecution}'");
-            }
-            else
-            {
-                Log("No sorted execution flag specified.");
-            }
-
-            return !string.IsNullOrEmpty(sortedExecution);
+            return returnValues;
         }
 
         static void TriggerBuilds(string server, string username, string password, List<Build> builds, bool dryRun)
@@ -408,39 +486,225 @@ BuildDebug");
 
                 foreach (Build build in builds)
                 {
-                    string content = $"<build><buildType id='{build.buildid}'/></build>";
+                    LogTCSection($"Queuing: {build.buildid}", () =>
+                    {
+                        foreach (Buildstep step in build.steps.Where(s => s.disable))
+                        {
+                            string stepAddress = $"{server}/app/rest/buildTypes/{build.buildid}/steps/{step.stepid}/disabled";
+                            LogColor($"Disabling: {build.buildid}.{step.stepid}: '{step.stepname}'", ConsoleColor.DarkMagenta);
+                            PutPlainTextContent(client, stepAddress, "true", "BuildDebug4", build.DontRun || dryRun);
+                        }
 
-                    string address = $"{server}/app/rest/buildQueue";
-                    client.Headers["Content-Type"] = "application/xml";
+                        string buildContent = $"<build><buildType id='{build.buildid}'/></build>";
+                        string buildAddress = $"{server}/app/rest/buildQueue";
+                        LogColor($"Triggering build: {build.buildid}", ConsoleColor.Magenta);
+                        dynamic queueResult = PostXmlContent(client, buildAddress, buildContent, "BuildDebug5", build.DontRun || dryRun);
 
-                    PostXmlContent(client, address, content, "BuildDebug3.json", dryRun);
+                        if (!(build.DontRun || dryRun))
+                        {
+                            bool added = false;
+                            do
+                            {
+                                Thread.Sleep(1000);
+                                string buildid = queueResult.id;
+                                string queueAddress = $"{server}/app/rest/builds/id:{buildid}";
+                                dynamic buildResult = GetJsonContent(client, queueAddress, "BuildDebug6");
+                                if (buildResult.waitReason == null)
+                                {
+                                    LogColor($"Build {buildid} queued.", ConsoleColor.Green);
+                                    added = true;
+                                }
+                                else
+                                {
+                                    LogColor($"Build {buildid} not queued yet: {buildResult.waitReason}", ConsoleColor.Green);
+                                }
+                            }
+                            while (!added);
+                        }
+
+                        foreach (Buildstep step in build.steps.Where(s => s.disable))
+                        {
+                            string stepAddress = $"{server}/app/rest/buildTypes/{build.buildid}/steps/{step.stepid}/disabled";
+                            LogColor($"Enabling: {build.buildid}.{step.stepid}: '{step.stepname}'", ConsoleColor.DarkMagenta);
+                            PutPlainTextContent(client, stepAddress, "false", "BuildDebug7", build.DontRun || dryRun);
+                        }
+                    });
                 }
             }
         }
 
-        static void PostXmlContent(WebClient client, string address, string content, string debugFilename, bool dryRun)
+        static string PutPlainTextContent(WebClient client, string address, string content, string debugFilename, bool dryRun)
         {
-            if (dryRun)
-            {
-                Log($"Address: '{address}', content: '{content}', dryRun: {dryRun}");
-            }
-            else
-            {
-                Log($"Address: '{address}', content: '{content}'");
-            }
+            client.Headers["Content-Type"] = "text/plain";
+            client.Headers["Accept"] = "text/plain";
+            Log($"Address: '{address}', content: '{content}'" + (dryRun ? $", dryRun: {dryRun}" : string.Empty));
             try
             {
+                if (_buildDebug)
+                {
+                    string debugfile = $"{debugFilename}.txt";
+                    if (!_writtenLogs.ContainsKey(debugfile))
+                    {
+                        File.WriteAllText(debugfile, content);
+                        _writtenLogs[debugfile] = true;
+                    }
+                }
+                string result = null;
                 if (!dryRun)
                 {
-                    string result = client.UploadString(address, content);
+                    result = client.UploadString(address, "PUT", content);
                 }
-                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BuildDebug")))
+                if (_buildDebug)
                 {
-                    if (!writtenLogs.ContainsKey(debugFilename))
+                    string resultfile = $"{debugFilename}.result.txt";
+                    if (!_writtenLogs.ContainsKey(resultfile))
                     {
-                        File.WriteAllText(debugFilename, content);
-                        writtenLogs[debugFilename] = true;
+                        if (result == null)
+                        {
+                            File.WriteAllText(resultfile, "N/A because of DryRun");
+                        }
+                        else
+                        {
+                            File.WriteAllText(resultfile, result);
+                        }
+                        _writtenLogs[resultfile] = true;
                     }
+                }
+                return result;
+            }
+            catch (WebException ex)
+            {
+                throw new ApplicationException(ex.Message, ex);
+            }
+        }
+
+        static JObject GetJsonContent(WebClient client, string address, string debugFilename)
+        {
+            client.Headers["Accept"] = "application/json";
+            Log($"Address: '{address}'");
+            try
+            {
+                string result = client.DownloadString(address);
+                if (_buildDebug)
+                {
+                    string resultfile = $"{debugFilename}.result.json";
+                    if (!_writtenLogs.ContainsKey(resultfile))
+                    {
+                        string pretty = JToken.Parse(result).ToString(Formatting.Indented);
+                        File.WriteAllText(resultfile, pretty);
+                    }
+                    _writtenLogs[resultfile] = true;
+                }
+                JObject jobject = JObject.Parse(result);
+                return jobject;
+            }
+            catch (WebException ex)
+            {
+                throw new ApplicationException(ex.Message, ex);
+            }
+        }
+
+        static JObject PutJsonContent(WebClient client, string address, JObject content, string debugFilename, bool dryRun)
+        {
+            client.Headers["Content-Type"] = "application/json";
+            client.Headers["Accept"] = "application/json";
+            Log($"Address: '{address}', content: '{content}'" + (dryRun ? $", dryRun: {dryRun}" : string.Empty));
+            try
+            {
+                if (_buildDebug)
+                {
+                    string debugfile = $"{debugFilename}.json";
+                    if (!_writtenLogs.ContainsKey(debugfile))
+                    {
+                        string pretty = content.ToString(Formatting.Indented);
+                        File.WriteAllText(debugfile, pretty);
+                        _writtenLogs[debugfile] = true;
+                    }
+                }
+                string result = null;
+                if (!dryRun)
+                {
+                    result = client.UploadString(address, "PUT", content.ToString());
+                }
+                if (_buildDebug)
+                {
+                    string resultfile = $"{debugFilename}.result.json";
+                    if (!_writtenLogs.ContainsKey(resultfile))
+                    {
+                        if (result == null)
+                        {
+                            File.WriteAllText(resultfile, "N/A because of DryRun");
+                        }
+                        else
+                        {
+                            string pretty = JObject.Parse(result).ToString(Formatting.Indented);
+                            File.WriteAllText(resultfile, pretty);
+                        }
+                        _writtenLogs[resultfile] = true;
+                    }
+                }
+                if (result == null)
+                {
+                    return null;
+                }
+                else
+                {
+                    JObject jobject = JObject.Parse(result);
+                    return jobject;
+                }
+            }
+            catch (WebException ex)
+            {
+                throw new ApplicationException(ex.Message, ex);
+            }
+        }
+
+        static JObject PostXmlContent(WebClient client, string address, string content, string debugFilename, bool dryRun)
+        {
+            client.Headers["Content-Type"] = "application/xml";
+            client.Headers["Accept"] = "application/json";
+            Log($"Address: '{address}', content: '{content}'" + (dryRun ? $", dryRun: {dryRun}" : string.Empty));
+            try
+            {
+                if (_buildDebug)
+                {
+                    string debugfile = $"{debugFilename}.xml";
+                    if (!_writtenLogs.ContainsKey(debugfile))
+                    {
+                        File.WriteAllText(debugfile, content);
+                        _writtenLogs[debugfile] = true;
+                    }
+                }
+                string result = null;
+                if (!dryRun)
+                {
+                    result = client.UploadString(address, content);
+                }
+                if (_buildDebug)
+                {
+                    string resultfile = $"{debugFilename}.result.json";
+                    if (!_writtenLogs.ContainsKey(resultfile))
+                    {
+                        if (result == null)
+                        {
+                            File.WriteAllText(resultfile, "N/A because of DryRun");
+                        }
+                        else
+                        {
+                            string pretty = JObject.Parse(result).ToString(Formatting.Indented);
+                            File.WriteAllText(resultfile, pretty);
+                        }
+                        _writtenLogs[resultfile] = true;
+                    }
+                }
+                if (result == null)
+                {
+                    return null;
+                }
+                else
+                {
+                    JObject jobject = JObject.Parse(result);
+                    return jobject;
                 }
             }
             catch (WebException ex)
@@ -508,7 +772,7 @@ BuildDebug");
 
             var valuesBuild = GetPropValues(rows);
 
-            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BuildDebug")))
+            if (_buildDebug)
             {
                 LogTCSection("Teamcity Properties", valuesBuild.Select(p => $"Build: {p.Key}={p.Value}"));
             }
@@ -535,7 +799,7 @@ BuildDebug");
 
             var valuesBuild = GetPropValues(rows);
 
-            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BuildDebug")))
+            if (_buildDebug)
             {
                 LogTCSection("Teamcity Properties", valuesBuild.Select(p => $"Build: {p.Key}={p.Value}"));
             }
@@ -557,7 +821,7 @@ BuildDebug");
 
             var valuesConfig = GetPropValues(rows);
 
-            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BuildDebug")))
+            if (_buildDebug)
             {
                 LogTCSection("Teamcity Properties", valuesConfig.Select(p => $"Config: {p.Key}={p.Value}"));
             }
@@ -585,10 +849,98 @@ BuildDebug");
 
         private static void LogTCSection(string message, IEnumerable<string> collection)
         {
-            Console.WriteLine(
-                $"##teamcity[blockOpened name='{message}']{Environment.NewLine}" +
-                string.Join(string.Empty, collection.Select(t => $"{t}{Environment.NewLine}")) +
-                $"##teamcity[blockClosed name='{message}']");
+            ConsoleColor oldColor = Console.ForegroundColor;
+            try
+            {
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine($"##teamcity[blockOpened name='{message}']");
+            }
+            finally
+            {
+                Console.ForegroundColor = oldColor;
+            }
+            try
+            {
+                Console.WriteLine(string.Join(string.Empty, collection.Select(t => $"{t}{Environment.NewLine}")));
+            }
+            finally
+            {
+                oldColor = Console.ForegroundColor;
+                try
+                {
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"##teamcity[blockClosed name='{message}']");
+                }
+                finally
+                {
+                    Console.ForegroundColor = oldColor;
+                }
+            }
+        }
+
+        private static void LogTCSection(string message, Action action)
+        {
+            ConsoleColor oldColor = Console.ForegroundColor;
+            try
+            {
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine($"##teamcity[blockOpened name='{message}']");
+            }
+            finally
+            {
+                Console.ForegroundColor = oldColor;
+            }
+            try
+            {
+                action.Invoke();
+            }
+            finally
+            {
+                oldColor = Console.ForegroundColor;
+                try
+                {
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"##teamcity[blockClosed name='{message}']");
+                }
+                finally
+                {
+                    Console.ForegroundColor = oldColor;
+                }
+            }
+        }
+
+        private static T LogTCSection<T>(string message, Func<T> func)
+        {
+            ConsoleColor oldColor = Console.ForegroundColor;
+            try
+            {
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine($"##teamcity[blockOpened name='{message}']");
+            }
+            finally
+            {
+                Console.ForegroundColor = oldColor;
+            }
+            T result;
+            try
+            {
+                result = func.Invoke();
+            }
+            finally
+            {
+                oldColor = Console.ForegroundColor;
+                try
+                {
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"##teamcity[blockClosed name='{message}']");
+                }
+                finally
+                {
+                    Console.ForegroundColor = oldColor;
+                }
+            }
+
+            return result;
         }
 
         private static void LogColor(string message, ConsoleColor color)
