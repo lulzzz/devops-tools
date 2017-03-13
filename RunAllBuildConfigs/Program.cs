@@ -39,7 +39,7 @@ namespace RunAllBuildConfigs
             if (args.Length != 0)
             {
                 Console.WriteLine(
-@"RunAllBuildConfigs 0.004 - Trigger all builds.
+@"RunAllBuildConfigs 0.005 - Trigger all builds.
 
 Usage: RunAllBuildConfigs.exe
 
@@ -484,9 +484,11 @@ BuildVerbose");
                     client.Headers[HttpRequestHeader.Authorization] = $"Basic {credentials}";
                 }
 
-                foreach (Build build in builds)
+                int disablecount = builds.Sum(b => b.steps.Count(s => s.disable));
+
+                LogTCSection($"Disabling {disablecount} buildsteps", () =>
                 {
-                    LogTCSection($"Queuing: {build.buildid}", () =>
+                    foreach (Build build in builds)
                     {
                         foreach (Buildstep step in build.steps.Where(s => s.disable))
                         {
@@ -494,7 +496,13 @@ BuildVerbose");
                             LogColor($"Disabling: {build.buildid}.{step.stepid}: '{step.stepname}'", ConsoleColor.DarkMagenta);
                             PutPlainTextContent(client, stepAddress, "true", "BuildDebug4", build.DontRun || dryRun);
                         }
+                    }
+                });
 
+                foreach (Build build in builds)
+                {
+                    LogTCSection($"Queuing: {build.buildid}", () =>
+                    {
                         string buildContent = $"<build><buildType id='{build.buildid}'/></build>";
                         string buildAddress = $"{server}/app/rest/buildQueue";
                         LogColor($"Triggering build: {build.buildid}", ConsoleColor.Magenta);
@@ -521,15 +529,21 @@ BuildVerbose");
                             }
                             while (!added);
                         }
+                    });
+                }
 
+                LogTCSection($"Enabling {disablecount} buildsteps", () =>
+                {
+                    foreach (Build build in builds)
+                    {
                         foreach (Buildstep step in build.steps.Where(s => s.disable))
                         {
                             string stepAddress = $"{server}/app/rest/buildTypes/{build.buildid}/steps/{step.stepid}/disabled";
                             LogColor($"Enabling: {build.buildid}.{step.stepid}: '{step.stepname}'", ConsoleColor.DarkMagenta);
                             PutPlainTextContent(client, stepAddress, "false", "BuildDebug7", build.DontRun || dryRun);
                         }
-                    });
-                }
+                    }
+                });
             }
         }
 
