@@ -499,14 +499,23 @@ BuildVerbose");
                     }
                 });
 
-                foreach (Build build in builds)
+                LogTCSection($"Queuing builds", () =>
                 {
-                    LogTCSection($"Queuing: {build.buildid}", () =>
+                    foreach (Build build in builds)
                     {
                         string buildContent = $"<build><buildType id='{build.buildid}'/></build>";
                         string buildAddress = $"{server}/app/rest/buildQueue";
                         LogColor($"Triggering build: {build.buildid}", ConsoleColor.Magenta);
-                        dynamic queueResult = PostXmlContent(client, buildAddress, buildContent, "BuildDebug5", build.DontRun || dryRun);
+                        PostXmlContent(client, buildAddress, buildContent, "BuildDebug5", build.DontRun || dryRun);
+                    }
+                });
+
+                LogTCSection($"Checking queue", () =>
+                {
+                    foreach (Build build in builds)
+                    {
+                        string buildContent = $"<build><buildType id='{build.buildid}'/></build>";
+                        string buildAddress = $"{server}/app/rest/buildQueue";
 
                         if (!(build.DontRun || dryRun))
                         {
@@ -529,8 +538,8 @@ BuildVerbose");
                             }
                             while (!added);
                         }
-                    });
-                }
+                    }
+                });
 
                 LogTCSection($"Enabling {disablecount} buildsteps", () =>
                 {
