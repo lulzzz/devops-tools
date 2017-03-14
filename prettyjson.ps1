@@ -28,6 +28,7 @@ function Load-Dependencies()
         exit 1
     }
 
+    Log ("Extracting: '" + $zipfilepath + "'")
     $shell = New-Object -com Shell.Application
     $shell.Namespace(((pwd).Path)).CopyHere($zipfilepath, 20)
 
