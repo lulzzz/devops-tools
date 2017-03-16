@@ -19,6 +19,7 @@ function Load-Dependencies()
     [string] $zipfile = "json.zip"
     [string] $dllfile = "Newtonsoft.Json.dll"
     [string] $zipfilepath = Join-Path (Join-Path (Join-Path (pwd).Path $zipfile) "lib\net45") $dllfile
+    [string] $dllfilepath = Join-Path $env:temp $dllfile
 
     Log ("Downloading: '" + $nugetpkg + "' -> '" + $zipfile + "'")
     Invoke-WebRequest -UseBasicParsing $nugetpkg -OutFile $zipfile
@@ -30,18 +31,17 @@ function Load-Dependencies()
 
     Log ("Extracting: '" + $zipfilepath + "'")
     $shell = New-Object -com Shell.Application
-    $shell.Namespace(((pwd).Path)).CopyHere($zipfilepath, 20)
+    $shell.Namespace($env:temp).CopyHere($zipfilepath, 20)
 
-    if (!(Test-Path $dllfile))
+    if (!(Test-Path $dllfilepath))
     {
-        Log ("Couldn't extract: '" + $dllfile + "'") Red
+        Log ("Couldn't extract: '" + $dllfilepath + "'") Red
         exit 1
     }
 
     Log ("Deleting file: '" + $zipfile + "'")
     del $zipfile
 
-    [string] $dllfilepath = Join-Path (pwd).Path $dllfile
     Log ("Loading assembly: '" + $dllfilepath + "'")
     [Reflection.Assembly]::LoadFile($dllfilepath) | Out-Null
 }
