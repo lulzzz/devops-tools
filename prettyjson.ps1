@@ -29,7 +29,7 @@ function Load-Dependencies()
         exit 1
     }
 
-    Log ("Extracting: '" + $zipfilepath + "'")
+    Log ("Extracting: '" + $zipfilepath + "' -> '" + $env:temp + "'")
     $shell = New-Object -com Shell.Application
     $shell.Namespace($env:temp).CopyHere($zipfilepath, 20)
 
