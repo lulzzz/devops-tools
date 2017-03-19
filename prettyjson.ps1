@@ -15,6 +15,12 @@ function Main()
 
 function Load-Dependencies()
 {
+    if ([Environment]::Version.Major -lt 4)
+    {
+        Log ("Newtonsoft.Json 9.0.1 requires .net 4 (Powershell 3.0), you have: " + [Environment]::Version) Red
+        exit 1
+    }
+
     [string] $nugetpkg = "https://www.nuget.org/api/v2/package/Newtonsoft.Json/9.0.1"
     [string] $zipfile = Join-Path $env:temp "json.zip"
     [string] $dllfile = "Newtonsoft.Json.dll"
@@ -22,7 +28,14 @@ function Load-Dependencies()
     [string] $dllfilepath = Join-Path $env:temp $dllfile
 
     Log ("Downloading: '" + $nugetpkg + "' -> '" + $zipfile + "'")
-    Invoke-WebRequest -UseBasicParsing $nugetpkg -OutFile $zipfile
+    if (Get-Command Invoke-WebRequest -ErrorAction SilentlyContinue)
+    {
+        Invoke-WebRequest -UseBasicParsing $nugetpkg -OutFile $zipfile
+    }
+    else
+    {
+        curl -L $nugetpkg -o $zipfile
+    }
     if (!(Test-Path $zipfile))
     {
         Log ("Couldn't download: '" + $zipfile + "'") Red
@@ -48,10 +61,10 @@ function Load-Dependencies()
 
 function Pretty-JsonFile([string] $filename)
 {
-    Log ("Reading: '" + $filename + "'")
+    Log ("Reading: '" + $filename + "'") Magenta
     [string] $content = [IO.File]::ReadAllText($filename)
 
-    Log ("Prettifying: '" + $filename + "'")
+    Log ("Prettifying: '" + $filename + "'") Magenta
     [string] $pretty = [Newtonsoft.Json.Linq.JToken]::Parse($content).ToString([Newtonsoft.Json.Formatting]::Indented)
 
     if ($pretty -ne $content)
