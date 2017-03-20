@@ -3,22 +3,30 @@ $ErrorActionPreference = "Stop"
 
 function Main()
 {
-    [string] $content = $OctopusParameters['ConfigfileContent']
+    iwr https://chocolatey.org/install.ps1 -UseBasicParsing | iex
+    choco install notepadplusplus "7-zip" -y
+
+    Deploy-Metricbeat
+}
+
+function Deploy-Metricbeat()
+{
+    [string] $content = $OctopusParameters['MetricbeatConfigfileContent']
     if (!$content)
     {
-        Write-Host ("ConfigfileContent not set") -f Red
+        Write-Host ("MetricbeatConfigfileContent not set") -f Red
         exit 1
     }
-    [string] $username = $OctopusParameters['Username']
+    [string] $username = $OctopusParameters['MetricbeatUsername']
     if (!$username)
     {
-        Write-Host ("Username not set") -f Red
+        Write-Host ("MetricbeatUsername not set") -f Red
         exit 1
     }
-    [string] $password = $OctopusParameters['Password']
+    [string] $password = $OctopusParameters['MetricbeatPassword']
     if (!$password)
     {
-        Write-Host ("Password not set") -f Red
+        Write-Host ("MetricbeatPassword not set") -f Red
         exit 1
     }
 
@@ -30,7 +38,6 @@ function Main()
         Stop-Service $servicename
     }
 
-    iwr https://chocolatey.org/install.ps1 -UseBasicParsing | iex
     choco install metricbeat -y --force
 
     [string] $filepattern = "metricbeat.yml"
@@ -51,6 +58,7 @@ function Main()
 
         $content = $content.Replace("#{Username}", $username)
         $content = $content.Replace("#{Password}", $password)
+        $content = $content.Replace("`n", "`r`n")
 
         [IO.File]::WriteAllText($filename, $content)
     }
