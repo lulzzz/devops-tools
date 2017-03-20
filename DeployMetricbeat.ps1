@@ -3,19 +3,19 @@ $ErrorActionPreference = "Stop"
 
 function Main()
 {
-    [string] $elasticurl = $OctopusParameters['elasticurl']
-    if (!$elasticurl)
+    [string] $content = $OctopusParameters['ConfigfileContent']
+    if (!$content)
     {
-        Write-Host ("Elasticurl not set") -f Red
+        Write-Host ("ConfigfileContent not set") -f Red
         exit 1
     }
-    [string] $username = $OctopusParameters['username']
+    [string] $username = $OctopusParameters['Username']
     if (!$username)
     {
         Write-Host ("Username not set") -f Red
         exit 1
     }
-    [string] $password = $OctopusParameters['password']
+    [string] $password = $OctopusParameters['Password']
     if (!$password)
     {
         Write-Host ("Password not set") -f Red
@@ -41,12 +41,9 @@ function Main()
     $files | % {
         [string] $filename = $_.FullName
         Write-Host ("Updating: '" + $filename + "'")
-        [string] $content = [IO.File]::ReadAllText($filename)
 
-        $content = $content.Replace("#- diskio", "- diskio")
-        $content = $content.Replace("hosts: [""localhost:9200""]", "hosts: [""" + $elasticurl + """]")
-        $content = $content.Replace("#username: ""elastic""", ("username: """ + $username + """"))
-        $content = $content.Replace("#password: ""changeme""", ("password: """ + $password + """"))
+        $content = $content.Replace("#{Username}", $username)
+        $content = $content.Replace("#{Password}", $password)
 
         [IO.File]::WriteAllText($filename, $content)
     }
