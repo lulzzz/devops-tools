@@ -23,6 +23,13 @@ function Main()
     }
 
 
+    [string] $servicename = "metricbeat"
+
+    if (Get-Service | ? { $_.Name -eq $servicename })
+    {
+        Stop-Service $servicename
+    }
+
     iwr https://chocolatey.org/install.ps1 -UseBasicParsing | iex
     choco install metricbeat -y --force
 
@@ -47,8 +54,6 @@ function Main()
 
         [IO.File]::WriteAllText($filename, $content)
     }
-
-    [string] $servicename = "metricbeat"
 
     if (!(Get-Service | ? { $_.Name -eq $servicename }))
     {
