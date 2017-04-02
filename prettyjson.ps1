@@ -17,7 +17,7 @@ function Load-Dependencies()
 {
     if ([Environment]::Version.Major -lt 4)
     {
-        Log ("Newtonsoft.Json 9.0.1 requires .net 4 (Powershell 3.0), you have: " + [Environment]::Version) Red
+        Log ("Newtonsoft.Json 10.0.2 requires .net 4 (Powershell 3.0), you have: " + [Environment]::Version) Red
         exit 1
     }
 
