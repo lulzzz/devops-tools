@@ -21,7 +21,7 @@ function Load-Dependencies()
         exit 1
     }
 
-    [string] $nugetpkg = "https://www.nuget.org/api/v2/package/Newtonsoft.Json/9.0.1"
+    [string] $nugetpkg = "https://www.nuget.org/api/v2/package/Newtonsoft.Json/10.0.2"
     [string] $zipfile = Join-Path $env:temp "json.zip"
     [string] $dllfile = "Newtonsoft.Json.dll"
     [string] $zipfilepath = Join-Path (Join-Path $zipfile "lib\net45") $dllfile
