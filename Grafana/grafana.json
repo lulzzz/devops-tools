@@ -1,8 +1,8 @@
 {
   "__inputs": [
     {
-      "name": "DS_MYELASTIC",
-      "label": "MyElastic",
+      "name": "DS_SAVINGSELASTIC",
+      "label": "SavingsElastic",
       "description": "",
       "type": "datasource",
       "pluginId": "elasticsearch",
@@ -47,7 +47,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 3,
           "legend": {
@@ -157,7 +157,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 4,
           "legend": {
@@ -266,7 +266,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 5,
           "legend": {
@@ -375,7 +375,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 2,
           "legend": {
@@ -486,7 +486,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 7,
           "legend": {
@@ -595,7 +595,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 6,
           "legend": {
@@ -716,7 +716,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 8,
           "legend": {
@@ -825,7 +825,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 9,
           "legend": {
@@ -934,7 +934,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 10,
           "legend": {
@@ -1043,7 +1043,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 11,
           "legend": {
@@ -1152,7 +1152,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 12,
           "legend": {
@@ -1261,7 +1261,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 13,
           "legend": {
@@ -1382,7 +1382,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 14,
           "legend": {
@@ -1504,7 +1504,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 15,
           "legend": {
@@ -1626,7 +1626,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 16,
           "legend": {
@@ -1748,7 +1748,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 17,
           "legend": {
@@ -1870,7 +1870,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 18,
           "legend": {
@@ -1992,7 +1992,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 19,
           "legend": {
@@ -2126,7 +2126,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 23,
           "legend": {
@@ -2236,7 +2236,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 24,
           "legend": {
@@ -2346,7 +2346,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 25,
           "legend": {
@@ -2413,7 +2413,7 @@
                   "type": "max"
                 }
               ],
-              "query": "(beat.hostname=\"vm-jumpbox*\") AND (beat.name=\"savings.uat.vm-jumpbox-win*\")",
+              "query": "beat.hostname=\"vm-jumpbox*\"",
               "refId": "A",
               "timeField": "@timestamp"
             }
@@ -2468,7 +2468,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 20,
           "legend": {
@@ -2578,7 +2578,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 21,
           "legend": {
@@ -2688,7 +2688,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_MYELASTIC}",
+          "datasource": "${DS_SAVINGSELASTIC}",
           "fill": 1,
           "id": 22,
           "legend": {
@@ -2841,5 +2841,5 @@
   },
   "timezone": "browser",
   "title": "Savings",
-  "version": 82
+  "version": 86
 }
