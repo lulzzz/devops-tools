@@ -97,8 +97,7 @@ BuildVerbose");
 
             string server = GetServer();
 
-            string username, password;
-            GetCredentials(out username, out password);
+            GetCredentials(out string username, out string password);
 
             string[] disabledBuildSteps = GetStringArrayEnvironmentVariable("BuildDisableBuildSteps", null);
             string[] disabledBuildStepTypes = GetStringArrayEnvironmentVariable("BuildDisableBuildStepTypes", null);
@@ -430,8 +429,7 @@ BuildVerbose");
             }
             else
             {
-                bool boolValue;
-                if (bool.TryParse(stringValue, out boolValue))
+                if (bool.TryParse(stringValue, out bool boolValue))
                 {
                     returnValue = boolValue;
                     Log($"Got environment variable: '{variableName}', value: '{returnValue}'");
