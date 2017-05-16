@@ -14,26 +14,33 @@ namespace PruneBackups
                 .Where(f => Path.GetFileName(f).Length == 34)
                 .ToArray();
 
-            Console.WriteLine($"Found {allfiles.Length} files.");
+            Log($"Found {allfiles.Length} files.");
 
             var dategroups = allfiles.GroupBy(f => Path.GetFileName(f).Substring(0, 24));
-            Console.WriteLine($"Found {dategroups.Count()} date groups.");
+            Log($"Found {dategroups.Count()} date groups.");
             foreach (var group in dategroups.OrderBy(g => g.Key))
             {
                 string date = group.Key;
                 string[] datefiles = allfiles.Where(f => Path.GetFileName(f).Substring(0, 24) == date).ToArray();
-                Console.WriteLine($"Found {datefiles.Length} files in group '{date}'");
+                Log($"Found {datefiles.Length} files in group '{date}'");
 
                 string keep = datefiles.OrderBy(f => f).Take(1).Single();
 
-                Console.WriteLine($"Keeping file: '{keep}'");
+                Log($"Keeping file: '{keep}'");
 
                 foreach (string filename in datefiles.OrderBy(f => f).Skip(1))
                 {
-                    Console.WriteLine($"Deleting file: '{filename}'");
-                    // File.Delete(filename);
+                    Log($"Deleting file: '{filename}'");
+                    File.Delete(filename);
                 }
             }
+        }
+
+        static void Log(string message)
+        {
+            string date = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+            Console.WriteLine($"{date}: {message}");
+            File.AppendAllText("prune-backups.log", $"{date}: {message}{Environment.NewLine}");
         }
     }
 }
