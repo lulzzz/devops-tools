@@ -15,7 +15,7 @@ namespace BackupGrafana
             logfile = Path.Combine(Directory.GetCurrentDirectory(), "BackupGrafana.log");
             PushToGit.logfile = logfile;
             SaveGrafana.logfile = logfile;
-            logreplace = new string[] { };
+            logreplace = Array.Empty<string>();
             PushToGit.logreplace = logreplace;
             SaveGrafana.logreplace = logreplace;
 
