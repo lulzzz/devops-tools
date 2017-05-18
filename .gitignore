@@ -2,6 +2,7 @@
 *.cache
 *.VC.db
 *.exe
+*.log
 *.opensdf
 *.pdb
 *.sdf
