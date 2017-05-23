@@ -8,18 +8,14 @@ namespace BackupGrafana
 {
     class Git
     {
-        public void Push(string sourcefolder, string server, string repopath, string repofolder, string username, string password, string email, bool gitsimulatepush)
+        public bool Push(string gitbinary, string sourcefolder, string server, string repopath, string repofolder, string username, string password, string email, bool gitsimulatepush)
         {
             Output.Replace = new List<string>() { username, password };
 
-            string gitexe = Environment.GetEnvironmentVariable("gitexe");
-            if (string.IsNullOrEmpty(gitexe))
+            if (!File.Exists(gitbinary))
             {
-                throw new Exception("gitexe environment variable not set.");
-            }
-            if (!File.Exists(gitexe))
-            {
-                throw new FileNotFoundException($"Git not found: '{gitexe}'");
+                Output.Write($"Git not found: '{gitbinary}'");
+                return false;
             }
 
             string rootfolder, subfolder;
@@ -42,7 +38,7 @@ namespace BackupGrafana
 
             Output.Write($"Using git url: '{url}'");
 
-            RunCommand(gitexe, $"--no-pager clone {url}");
+            RunCommand(gitbinary, $"--no-pager clone {url}");
             Directory.SetCurrentDirectory(rootfolder);
             Output.Write($"Current directory: '{Directory.GetCurrentDirectory()}'");
 
@@ -54,7 +50,7 @@ namespace BackupGrafana
             if (Filesystem.CompareFolders(relativesourcefolder, targetfolder))
             {
                 Output.Write($"No changes found: '{relativesourcefolder}' '{targetfolder}'");
-                return;
+                return true;
             }
 
 
@@ -68,19 +64,19 @@ namespace BackupGrafana
 
 
             Output.Write("Adding/updating/deleting files...");
-            RunCommand(gitexe, "--no-pager add -A");
+            RunCommand(gitbinary, "--no-pager add -A");
 
             Output.Write("Setting config...");
-            RunCommand(gitexe, $"config user.email {email}");
-            RunCommand(gitexe, $"config user.name {username}");
+            RunCommand(gitbinary, $"config user.email {email}");
+            RunCommand(gitbinary, $"config user.name {username}");
 
             string commitmessage = "Automatic gathering of Grafana dashboard files: " + DateTime.Now.ToString("yyyyMMdd HHmmss");
 
             Output.Write("Committing...");
-            RunCommand(gitexe, $"--no-pager commit -m \"{commitmessage}\"");
+            RunCommand(gitbinary, $"--no-pager commit -m \"{commitmessage}\"");
 
             Output.Write("Setting config...");
-            RunCommand(gitexe, "config push.default simple");
+            RunCommand(gitbinary, "config push.default simple");
 
             Output.Write("Pushing...");
             if (gitsimulatepush)
@@ -89,18 +85,20 @@ namespace BackupGrafana
             }
             else
             {
-                RunCommand(gitexe, "--no-pager push");
+                RunCommand(gitbinary, "--no-pager push");
             }
+
+            return true;
         }
 
-        string RunCommand(string exefile, string args, bool redirect = false)
+        string RunCommand(string binfile, string args, bool redirect = false)
         {
-            Output.Write($"Running: '{exefile}' '{args}'");
+            Output.Write($"Running: '{binfile}' '{args}'");
 
             Process process = new Process();
             if (redirect)
             {
-                process.StartInfo = new ProcessStartInfo(exefile, args)
+                process.StartInfo = new ProcessStartInfo(binfile, args)
                 {
                     UseShellExecute = false,
                     RedirectStandardOutput = true
@@ -108,7 +106,7 @@ namespace BackupGrafana
             }
             else
             {
-                process.StartInfo = new ProcessStartInfo(exefile, args)
+                process.StartInfo = new ProcessStartInfo(binfile, args)
                 {
                     UseShellExecute = false
                 };
@@ -119,7 +117,7 @@ namespace BackupGrafana
 
             if (process.ExitCode != 0)
             {
-                throw new Exception($"Failed to execute: '{exefile}', args: '{args}'");
+                throw new Exception($"Failed to execute: '{binfile}', args: '{args}'");
             }
 
             return redirect ? process.StandardOutput.ReadToEnd() : null;
