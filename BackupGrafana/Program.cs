@@ -7,21 +7,13 @@ namespace BackupGrafana
 {
     class Program
     {
-        public static string logfile { get; set; }
-        public static string[] logreplace { get; set; }
-
         static int Main(string[] args)
         {
-            logfile = Path.Combine(Directory.GetCurrentDirectory(), "BackupGrafana.log");
-            PushToGit.logfile = logfile;
-            SaveGrafana.logfile = logfile;
-            logreplace = Array.Empty<string>();
-            PushToGit.logreplace = logreplace;
-            SaveGrafana.logreplace = logreplace;
+            Output.Logfile = Path.Combine(Directory.GetCurrentDirectory(), "BackupGrafana.log");
 
             if (args.Length != 3)
             {
-                Log("Usage: BackupGrafana <serverurl> <username> <password>");
+                Output.Write("Usage: BackupGrafana <serverurl> <username> <password>");
                 return 1;
             }
 
@@ -30,8 +22,11 @@ namespace BackupGrafana
             string password = args[2];
             string folder = "dashboards";
 
-            SaveGrafana grafana = new SaveGrafana();
-            grafana.SaveDashboards(url, username, password, folder);
+            Grafana grafana = new Grafana();
+            if (!grafana.SaveDashboards(url, username, password, folder))
+            {
+                return 1;
+            }
 
             string gitsourcefolder = folder;
             string gitserver = Environment.GetEnvironmentVariable("gitserver");
@@ -59,11 +54,11 @@ namespace BackupGrafana
                 if (string.IsNullOrEmpty(gitemail))
                     missing.AppendLine("Missing gitemail.");
 
-                Log("Missing git environment variables, will not push Grafana dashboard files to Git." + Environment.NewLine + missing.ToString());
+                Output.Write("Missing git environment variables, will not push Grafana dashboard files to Git." + Environment.NewLine + missing.ToString());
             }
             else
             {
-                PushToGit git = new PushToGit();
+                Git git = new Git();
                 git.Push(gitsourcefolder, gitserver, gitrepopath, gitrepofolder, gitusername, gitpassword, gitemail, gitsimulatepush);
             }
 
@@ -86,20 +81,6 @@ namespace BackupGrafana
                 }
                 return boolValue;
             }
-        }
-
-        static void Log(string message)
-        {
-            string date = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
-
-            string replace = message;
-            foreach (string replacestring in logreplace)
-            {
-                replace = replace.Replace(replacestring, string.Join(string.Empty, Enumerable.Repeat("*", replacestring.Length)));
-            }
-
-            Console.WriteLine($"{date}: {replace}");
-            File.AppendAllText(logfile, $"{date}: {replace}{Environment.NewLine}");
         }
     }
 }

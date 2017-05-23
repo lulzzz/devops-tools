@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -8,19 +9,16 @@ using System.Text;
 
 namespace BackupGrafana
 {
-    class SaveGrafana
+    class Grafana
     {
-        public static string logfile { get; set; }
-        public static string[] logreplace { get; set; }
-
-        public void SaveDashboards(string serverurl, string username, string password, string folder)
+        public bool SaveDashboards(string serverurl, string username, string password, string folder)
         {
-            logreplace = new[] { username, password };
+            Output.Replace = new List<string>() { username, password };
 
-            if (!Directory.Exists(folder))
-            {
-                Directory.CreateDirectory(folder);
-            }
+            Filesystem.RobustDelete(folder);
+
+            Output.Write($"Creating directory: '{folder}'");
+            Directory.CreateDirectory(folder);
 
             using (HttpClient client = new HttpClient())
             {
@@ -29,20 +27,29 @@ namespace BackupGrafana
 
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-                Log("Retrieving orgs.");
+                Output.Write("Retrieving orgs.");
                 string url = $"{serverurl}/api/orgs";
-                string result = client.GetStringAsync(url).Result;
+                string result;
+                try
+                {
+                    result = client.GetStringAsync(url).Result;
+                }
+                catch (AggregateException ex)
+                {
+                    Output.Write($"Couldn't connect to Grafana server: '{url}' '{ex.Message}'");
+                    return false;
+                }
 
                 JArray orgs = JArray.Parse(result);
 
                 foreach (dynamic org in orgs)
                 {
-                    Log($"Switching to org: {org.id} '{org.name}'");
+                    Output.Write($"Switching to org: {org.id} '{org.name}'");
                     url = $"{serverurl}/api/user/using/{org.id}";
                     var postresult = client.PostAsync(url, null);
                     result = postresult.Result.Content.ReadAsStringAsync().Result;
 
-                    Log("Searching for dashboards.");
+                    Output.Write("Searching for dashboards.");
                     url = $"{serverurl}/api/search/";
                     result = client.GetStringAsync(url).Result;
 
@@ -50,7 +57,7 @@ namespace BackupGrafana
 
                     foreach (dynamic j in array)
                     {
-                        Log($"Retrieving dashboard: '{j.uri}'");
+                        Output.Write($"Retrieving dashboard: '{j.uri}'");
                         url = $"{serverurl}/api/dashboards/{j.uri}";
                         result = client.GetStringAsync(url).Result;
 
@@ -58,17 +65,24 @@ namespace BackupGrafana
 
                         string name = dashboard.meta.slug;
 
+                        dashboard.meta.Property("expires").Remove();
+                        dashboard.meta.Property("created").Remove();
+                        dashboard.meta.Property("updated").Remove();
+                        dashboard.meta.Property("updatedBy").Remove();
+                        dashboard.meta.Property("createdBy").Remove();
+                        dashboard.meta.Property("version").Remove();
+
                         string filename = Path.Combine(folder, PrettyName($"{org.name}_{name}") + ".json");
 
-                        string pretty = JToken.Parse(result).ToString(Newtonsoft.Json.Formatting.Indented);
+                        string pretty = dashboard.ToString(Newtonsoft.Json.Formatting.Indented);
 
-                        Log($"Saving: '{filename}'");
+                        Output.Write($"Saving: '{filename}'");
                         File.WriteAllText(filename, pretty);
                     }
                 }
             }
 
-            return;
+            return true;
         }
 
         string PrettyName(string name)
@@ -84,20 +98,6 @@ namespace BackupGrafana
             }
 
             return result.ToString();
-        }
-
-        static void Log(string message)
-        {
-            string date = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
-
-            string replace = message;
-            foreach (string replacestring in logreplace)
-            {
-                replace = replace.Replace(replacestring, string.Join(string.Empty, Enumerable.Repeat("*", replacestring.Length)));
-            }
-
-            Console.WriteLine($"{date}: {replace}");
-            File.AppendAllText(logfile, $"{date}: {replace}{Environment.NewLine}");
         }
     }
 }
