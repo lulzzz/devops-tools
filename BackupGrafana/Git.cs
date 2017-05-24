@@ -70,7 +70,8 @@ namespace BackupGrafana
             RunCommand(gitbinary, $"config user.email {email}");
             RunCommand(gitbinary, $"config user.name {username}");
 
-            string commitmessage = "Automatic gathering of Grafana dashboard files: " + DateTime.Now.ToString("yyyyMMdd HHmmss");
+            string date = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+            string commitmessage = $"Automatic gathering of Grafana dashboard files: {date}";
 
             Output.Write("Committing...");
             RunCommand(gitbinary, $"--no-pager commit -m \"{commitmessage}\"");
