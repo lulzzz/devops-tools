@@ -3,16 +3,17 @@ $ErrorActionPreference = "Stop"
 
 function Main($mainargs)
 {
-    if (!$mainargs -or $mainargs.Length -ne 3)
+    if (!$mainargs -or $mainargs.Length -ne 4)
     {
         Log ("Script for creating infrastructure from arm template.")
-        Log ("Usage: powershell .\CreateInfrastructure.ps1 <subscription> <name> <password>")
+        Log ("Usage: powershell .\CreateInfrastructure.ps1 <subscription> <name> <username> <password>")
         exit 1
     }
 
     [string] $subscriptionName = $mainargs[0]
     [string] $name = $mainargs[1]
-    [string] $password = $mainargs[2]
+    [string] $username = $mainargs[2]
+    [string] $password = $mainargs[3]
 
     [string] $resourceGroupName = "Group-" + $name
     [string] $location = "West Europe"
@@ -21,7 +22,7 @@ function Main($mainargs)
     [string] $parametersFile = Join-Path $name "parameters.json"
 
 
-    Create-Files $templateFolder $name $password
+    Create-Files $templateFolder $name $username $password
 
 
     if (!(Test-Path $templateFile))
@@ -49,7 +50,7 @@ function Main($mainargs)
     New-AzureRmResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile $templateFile -TemplateParameterFile $parametersFile
 }
 
-function Create-Files([string] $folder, [string] $newname, [string] $password)
+function Create-Files([string] $folder, [string] $newname, [string] $username, [string] $password)
 {
     if (Test-Path $newname)
     {
@@ -75,7 +76,7 @@ function Create-Files([string] $folder, [string] $newname, [string] $password)
 
     [string] $filename = Join-Path $newname "parameters.json"
 
-    Update-PasswordInParametersFile $filename $password
+    Update-CredentialsInParametersFile $filename $username $password
     Update-IpAddressInParametersFile $filename
 }
 
@@ -95,12 +96,25 @@ function Update-JsonFile([string] $infile, [string] $outfile, [string] $newname)
     [IO.File]::WriteAllText($outfile, $pretty)
 }
 
-function Update-PasswordInParametersFile([string] $filename, [string] $password)
+function Update-CredentialsInParametersFile([string] $filename, [string] $username, [string] $password)
 {
     Log ("Reading: '" + $filename + "'")
     [string] $content = [IO.File]::ReadAllText($filename)
 
     $json = [Newtonsoft.Json.Linq.JToken]::Parse($content)
+    
+    $elements = $json.parameters.Children() | ? { $_.Name.EndsWith("Username") -or $_.Name.EndsWith("username") }
+
+    if ($elements)
+    {
+        $elements | % {
+            $_.value.value = $username
+        }
+
+        Log ("Saving: '" + $filename + "'")
+        [string] $content = $json.ToString([Newtonsoft.Json.Formatting]::Indented)
+        [IO.File]::WriteAllText($filename, $content)
+    }
 
     $elements = $json.parameters.Children() | ? { $_.Name.EndsWith("Password") -or $_.Name.EndsWith("password") }
 
