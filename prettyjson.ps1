@@ -34,7 +34,7 @@ function Load-Dependencies()
     }
     else
     {
-        curl -L $nugetpkg -o $zipfile
+        curl.exe -L $nugetpkg -o $zipfile
     }
     if (!(Test-Path $zipfile))
     {
