@@ -198,13 +198,14 @@ function Load-Dependencies()
 
 function Log([string] $message, $color)
 {
+    [string] $date = [DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
     if ($color)
     {
-        Write-Host ((Get-Date).ToString("HHmmss") + ": " + $message) -f $color
+        Write-Host ($date + ": " + $message) -f $color
     }
     else
     {
-        Write-Host ((Get-Date).ToString("HHmmss") + ": " + $message) -f Green
+        Write-Host ($date + ": " + $message) -f Green
     }
 }
 
