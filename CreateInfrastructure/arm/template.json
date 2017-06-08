@@ -43,6 +43,9 @@
     },
     "rdpIpAddress": {
       "type": "string"
+    },
+    "osDiskSizeGB": {
+      "type": "string"
     }
   },
   "variables": {
@@ -81,7 +84,8 @@
             "createOption": "fromImage",
             "managedDisk": {
               "storageAccountType": "Premium_LRS"
-            }
+            },
+            "diskSizeGB": "[parameters('osDiskSizeGB')]"
           },
           "dataDisks": []
         },

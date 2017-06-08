@@ -43,6 +43,9 @@
     },
     "rdpIpAddress": {
       "value": "1.2.3.4"
+    },
+    "osDiskSizeGB": {
+      "value": "128"
     }
   }
 }
