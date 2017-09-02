@@ -1,6 +1,6 @@
 # Execute in Kibana Dev Tools
 
-PUT _ingest/pipeline/runscope
+PUT _ingest/pipeline/runscopejsonresult
 {
   "description": "Ingest pipeline for Runscope requests",
   "processors": [
@@ -41,12 +41,17 @@ PUT _ingest/pipeline/runscope
       }
     },
     {
-      "date_index_name" : {
+      "date_index_name": {
         "field": "started_at",
         "index_name_prefix": "runscope-",
         "date_rounding": "M",
         "date_formats": ["ISO8601"],
         "index_name_format": "yyyy.MM"
+      }
+    },
+    {
+      "json": {
+        "field": "variables.result"
       }
     }
   ]

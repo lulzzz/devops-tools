@@ -1,0 +1,53 @@
+# Execute in Kibana Dev Tools
+
+PUT _ingest/pipeline/runscope
+{
+  "description": "Ingest pipeline for Runscope requests",
+  "processors": [
+    {
+      "convert": {
+        "field": "finished_at",
+        "type": "string"
+      }
+    },
+    {
+      "date": {
+        "field": "finished_at",
+        "formats": ["UNIX"]
+      }
+    },
+    {
+      "grok": {
+        "field": "@timestamp",
+        "patterns": ["%{GREEDYDATA:finished_at}"]
+      }
+    },
+    {
+      "convert": {
+        "field": "started_at",
+        "type": "string"
+      }
+    },
+    {
+      "date": {
+        "field": "started_at",
+        "formats": ["UNIX"]
+      }
+    },
+    {
+      "grok": {
+        "field": "@timestamp",
+        "patterns": ["%{GREEDYDATA:started_at}"]
+      }
+    },
+    {
+      "date_index_name": {
+        "field": "started_at",
+        "index_name_prefix": "runscope-",
+        "date_rounding": "M",
+        "date_formats": ["ISO8601"],
+        "index_name_format": "yyyy.MM"
+      }
+    }
+  ]
+}
