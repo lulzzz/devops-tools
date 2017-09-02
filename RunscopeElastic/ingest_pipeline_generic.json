@@ -48,6 +48,11 @@ PUT _ingest/pipeline/runscope
         "date_formats": ["ISO8601"],
         "index_name_format": "yyyy.MM"
       }
+    },
+    {
+      "script": {
+        "inline": "ctx.request = ctx.requests[ctx.requests.length-1]"
+      }
     }
   ]
 }

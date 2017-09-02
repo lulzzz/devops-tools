@@ -50,6 +50,11 @@ PUT _ingest/pipeline/runscopejsonresult
       }
     },
     {
+      "script": {
+        "inline": "ctx.request = ctx.requests[ctx.requests.length-1]"
+      }
+    },
+    {
       "json": {
         "field": "variables.result"
       }
