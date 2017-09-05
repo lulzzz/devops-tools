@@ -9,7 +9,7 @@
       "value": "vm-REPLACE_NAME"
     },
     "virtualMachineSize": {
-      "value": "Standard_DS11_v2"
+      "value": "Standard_E2s_v3"
     },
     "adminUsername": {
       "value": "adminusername"
@@ -45,7 +45,10 @@
       "value": "1.2.3.4"
     },
     "osDiskSizeGB": {
-      "value": "128"
+      "value": "256"
+    },
+    "osDiskName": {
+      "value": "disk-REPLACE_NAME"
     }
   }
 }

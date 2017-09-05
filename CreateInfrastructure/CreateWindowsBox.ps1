@@ -3,10 +3,10 @@ $ErrorActionPreference = "Stop"
 
 function Main($mainargs)
 {
-    if (!$mainargs -or $mainargs.Length -ne 4)
+    if (!$mainargs -or (($mainargs.Length -ne 4) -and ($mainargs.Length -ne 5)))
     {
         Log ("Script for creating infrastructure from arm template.")
-        Log ("Usage: powershell .\CreateInfrastructure.ps1 <subscription> <name> <username> <password>")
+        Log ("Usage: powershell .\CreateInfrastructure.ps1 <subscription> <name> <username> <password> [resourcegroup]")
         exit 1
     }
 
@@ -14,10 +14,17 @@ function Main($mainargs)
     [string] $name = $mainargs[1]
     [string] $username = $mainargs[2]
     [string] $password = $mainargs[3]
-
-    [string] $resourceGroupName = "Group-" + $name
+    [string] $resourceGroupName = $null
+    if ($mainargs.Count -eq 5)
+    {
+        [string] $resourceGroupName = $mainargs[4]
+    }
+    else
+    {
+        [string] $resourceGroupName = "Group-" + $name
+    }
     [string] $location = "West Europe"
-    [string] $templateFolder = "arm"
+    [string] $templateFolder = "armwindows"
     [string] $templateFile = Join-Path $name "template.json"
     [string] $parametersFile = Join-Path $name "parameters.json"
 
@@ -43,8 +50,15 @@ function Main($mainargs)
     Get-AzureRmSubscription | % { $_.SubscriptionName } | sort | % { Log ("'" + $_ + "'") }
     Set-AzureRmContext -SubscriptionName $subscriptionName
 
-    Log ("Creating resource group '" + $resourceGroupName + "' in '" + $location + "'")
-    New-AzureRmResourceGroup -Name $resourceGroupName -Location $location
+    if ($mainargs.Count -eq 4)
+    {
+        Log ("Creating resource group '" + $resourceGroupName + "' in '" + $location + "'")
+        New-AzureRmResourceGroup -Name $resourceGroupName -Location $location
+    }
+    else
+    {
+        Log ("Using existing resource group '" + $resourceGroupName + "'")
+    }
 
     Log ("Deploying: '" + $resourceGroupName + "' '" + $templateFile + "' '" + $parametersFile + "'")
     New-AzureRmResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile $templateFile -TemplateParameterFile $parametersFile
