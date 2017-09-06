@@ -55,6 +55,21 @@ PUT _ingest/pipeline/runscopejsonresult
       }
     },
     {
+      "script": {
+        "inline": "if (ctx.region_name == \"None - None\") { ctx.region_name = \"vm-runscope\" }"
+      }
+    },
+    {
+      "script": {
+        "inline": "if (ctx.region_name == \"Ireland - None\") { ctx.region_name = \"Ireland\" }"
+      }
+    },
+    {
+      "script": {
+        "inline": "if (ctx.region_name == \"London - None\") { ctx.region_name = \"London\" }"
+      }
+    },
+    {
       "json": {
         "field": "variables.result"
       }

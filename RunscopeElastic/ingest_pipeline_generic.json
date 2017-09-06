@@ -1,5 +1,6 @@
 # Execute in Kibana Dev Tools
 
+PUT _i
 PUT _ingest/pipeline/runscope
 {
   "description": "Ingest pipeline for Runscope requests",
@@ -52,6 +53,21 @@ PUT _ingest/pipeline/runscope
     {
       "script": {
         "inline": "ctx.request = ctx.requests[ctx.requests.length-1]"
+      }
+    },
+    {
+      "script": {
+        "inline": "if (ctx.region_name == \"None - None\") { ctx.region_name = \"vm-runscope\" }"
+      }
+    },
+    {
+      "script": {
+        "inline": "if (ctx.region_name == \"Ireland - None\") { ctx.region_name = \"Ireland\" }"
+      }
+    },
+    {
+      "script": {
+        "inline": "if (ctx.region_name == \"London - None\") { ctx.region_name = \"London\" }"
       }
     }
   ]
