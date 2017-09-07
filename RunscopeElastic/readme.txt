@@ -2,7 +2,7 @@ This is an integration for injecting monitoring results from Runscope into Elast
 
 A webhook needs to be configured in Runscope that posts a json document to Elastic for each request.
 To make most use of the json document, it has to be transformed a bit before inserted into Elastic,
-this is done by utilizing an ingest pipeline. The generic ingest pipeline provied is useful for
+this is done by utilizing an ingest pipeline. The generic ingest pipeline provided is useful for
 monitoring any service. The jsonresult pipeline is useful for monitoring services that returns a
 json document in the body, an example of this is the _cluster/health page in Elasticsearch.
 I.e. the Elasticsearch specific ingest pipeline should be used when posting monitoring results of
