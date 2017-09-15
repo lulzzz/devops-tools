@@ -61,7 +61,7 @@ PUT _ingest/pipeline/runscopejsonresult
     },
     {
       "script": {
-        "inline": "if (ctx.region_name.endsWith(\" - None\")) { ctx.region_name = ctx.region_name.substring(0,ctx.region_name.length-7) }"
+        "inline": "if (ctx.region_name.endsWith(\" - None\")) { ctx.region_name = ctx.region_name.substring(0,ctx.region_name.length()-7) }"
       }
     },
     {
