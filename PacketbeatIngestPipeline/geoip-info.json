@@ -1,0 +1,40 @@
+# Make sure to add pipeline: geoip-info in packetbeat.yml
+
+PUT _ingest/pipeline/geoip-info
+{
+  "description": "Add geoip info",
+  "processors": [
+    {
+      "geoip": {
+        "field": "client_ip",
+        "target_field": "client_geoip",
+        "properties": ["ip", "continent_name", "country_iso_code", "country_name", "region_name", "city_name", "location"],
+        "ignore_failure": true
+      }
+    },
+    {
+      "geoip": {
+        "field": "ip",
+        "target_field": "client_geoip",
+        "properties": ["ip", "continent_name", "country_iso_code", "country_name", "region_name", "city_name", "location"],
+        "ignore_failure": true
+      }
+    },
+    {
+      "geoip": {
+        "field": "source.ip",
+        "target_field": "client_geoip",
+        "properties": ["ip", "continent_name", "country_iso_code", "country_name", "region_name", "city_name", "location"],
+        "ignore_failure": true
+      }
+    },
+    {
+      "geoip": {
+        "field": "dest.ip",
+        "target_field": "client_geoip",
+        "properties": ["ip", "continent_name", "country_iso_code", "country_name", "region_name", "city_name", "location"],
+        "ignore_failure": true
+      }
+    }
+  ]
+}
