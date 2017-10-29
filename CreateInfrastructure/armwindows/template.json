@@ -2,6 +2,9 @@
   "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
+    "vnetResourceGroupName": {
+      "type": "string"
+    },
     "location": {
       "type": "string"
     },
@@ -41,6 +44,9 @@
     "publicIpAddressType": {
       "type": "string"
     },
+    "publicIpAddressSku": {
+      "type": "string"
+    },
     "rdpIpAddress": {
       "type": "string"
     },
@@ -52,7 +58,7 @@
     }
   },
   "variables": {
-    "vnetId": "[resourceId('Group-REPLACE_NAME','Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
+    "vnetId": "[resourceId(parameters('vnetResourceGroupName'), 'Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
     "subnetRef": "[concat(variables('vnetId'), '/subnets/', parameters('subnetName'))]"
   },
   "resources": [
@@ -105,7 +111,7 @@
     {
       "name": "[parameters('virtualNetworkName')]",
       "type": "Microsoft.Network/virtualNetworks",
-      "apiVersion": "2016-12-01",
+      "apiVersion": "2017-08-01",
       "location": "[parameters('location')]",
       "properties": {
         "addressSpace": {
@@ -143,29 +149,32 @@
               },
               "privateIPAllocationMethod": "Dynamic",
               "publicIpAddress": {
-                "id": "[resourceId('Group-REPLACE_NAME','Microsoft.Network/publicIpAddresses', parameters('publicIpAddressName'))]"
+                "id": "[resourceId(parameters('vnetResourceGroupName'), 'Microsoft.Network/publicIpAddresses', parameters('publicIpAddressName'))]"
               }
             }
           }
         ],
         "networkSecurityGroup": {
-          "id": "[resourceId('Group-REPLACE_NAME', 'Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroupName'))]"
+          "id": "[resourceId(parameters('vnetResourceGroupName'), 'Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroupName'))]"
         }
       }
     },
     {
       "name": "[parameters('publicIpAddressName')]",
       "type": "Microsoft.Network/publicIpAddresses",
-      "apiVersion": "2016-11-01",
+      "apiVersion": "2017-08-01",
       "location": "[parameters('location')]",
       "properties": {
         "publicIpAllocationMethod": "[parameters('publicIpAddressType')]"
+      },
+      "sku": {
+        "name": "[parameters('publicIpAddressSku')]"
       }
     },
     {
       "name": "[parameters('networkSecurityGroupName')]",
       "type": "Microsoft.Network/networkSecurityGroups",
-      "apiVersion": "2016-09-01",
+      "apiVersion": "2017-06-01",
       "location": "[parameters('location')]",
       "properties": {
         "securityRules": [
@@ -173,13 +182,13 @@
             "name": "default-allow-rdp",
             "properties": {
               "priority": 1000,
-              "sourceAddressPrefix": "[parameters('rdpIpAddress')]",
               "protocol": "TCP",
-              "destinationPortRange": "3389",
               "access": "Allow",
               "direction": "Inbound",
+              "sourceAddressPrefix": "[parameters('rdpIpAddress')]",
               "sourcePortRange": "*",
-              "destinationAddressPrefix": "*"
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "3389"
             }
           }
         ]

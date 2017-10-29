@@ -17,11 +17,11 @@ function Load-Dependencies()
 {
     if ([Environment]::Version.Major -lt 4)
     {
-        Log ("Newtonsoft.Json 10.0.2 requires .net 4 (Powershell 3.0), you have: " + [Environment]::Version) Red
+        Log ("Newtonsoft.Json 10.0.3 requires .net 4 (Powershell 3.0), you have: " + [Environment]::Version) Red
         exit 1
     }
 
-    [string] $nugetpkg = "https://www.nuget.org/api/v2/package/Newtonsoft.Json/10.0.2"
+    [string] $nugetpkg = "https://www.nuget.org/api/v2/package/Newtonsoft.Json/10.0.3"
     [string] $zipfile = Join-Path $env:temp "json.zip"
     [string] $dllfile = "Newtonsoft.Json.dll"
     [string] $zipfilepath = Join-Path (Join-Path $zipfile "lib\net45") $dllfile
