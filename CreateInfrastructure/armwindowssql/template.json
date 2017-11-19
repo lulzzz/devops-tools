@@ -17,8 +17,8 @@
     "adminUsername": {
       "type": "string"
     },
-    "adminPublicKey": {
-      "type": "string"
+    "adminPassword": {
+      "type": "securestring"
     },
     "virtualNetworkName": {
       "type": "string"
@@ -47,7 +47,7 @@
     "publicIpAddressSku": {
       "type": "string"
     },
-    "sshIpAddress": {
+    "rdpIpAddress": {
       "type": "string"
     },
     "osDiskSizeGB": {
@@ -55,6 +55,15 @@
     },
     "osDiskName": {
       "type": "string"
+    },
+    "sqlServerName": {
+      "type": "string"
+    },
+    "sqlAdministratorUsername": {
+      "type": "string"
+    },
+    "sqlAdministratorPassword": {
+      "type": "securestring"
     }
   },
   "variables": {
@@ -74,16 +83,9 @@
         "osProfile": {
           "computerName": "[parameters('virtualMachineName')]",
           "adminUsername": "[parameters('adminUsername')]",
-          "linuxConfiguration": {
-            "disablePasswordAuthentication": "true",
-            "ssh": {
-              "publicKeys": [
-                {
-                  "path": "[concat('/home/', parameters('adminUsername'), '/.ssh/authorized_keys')]",
-                  "keyData": "[parameters('adminPublicKey')]"
-                }
-              ]
-            }
+          "adminPassword": "[parameters('adminPassword')]",
+          "windowsConfiguration": {
+            "provisionVmAgent": "true"
           }
         },
         "hardwareProfile": {
@@ -91,9 +93,9 @@
         },
         "storageProfile": {
           "imageReference": {
-            "publisher": "Canonical",
-            "offer": "UbuntuServer",
-            "sku": "17.04",
+            "publisher": "MicrosoftWindowsServer",
+            "offer": "WindowsServer",
+            "sku": "2016-Datacenter",
             "version": "latest"
           },
           "osDisk": {
@@ -186,20 +188,46 @@
       "properties": {
         "securityRules": [
           {
-            "name": "default-allow-ssh",
+            "name": "default-allow-rdp",
             "properties": {
               "priority": 1000,
-              "sourceAddressPrefix": "[parameters('sshIpAddress')]",
               "protocol": "TCP",
-              "destinationPortRange": "22",
               "access": "Allow",
               "direction": "Inbound",
+              "sourceAddressPrefix": "[parameters('rdpIpAddress')]",
               "sourcePortRange": "*",
-              "destinationAddressPrefix": "*"
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "3389"
             }
           }
         ]
       }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "location": "[parameters('location')]",
+      "name": "[parameters('sqlServerName')]",
+      "properties": {
+        "administratorLogin": "[parameters('sqlAdministratorUsername')]",
+        "administratorLoginPassword": "[parameters('sqlAdministratorPassword')]",
+        "version": "12.0"
+      },
+      "resources": [
+        {
+          "apiVersion": "2014-04-01-preview",
+          "dependsOn": [
+            "[concat('Microsoft.Sql/servers/', parameters('sqlServerName'))]"
+          ],
+          "location": "[parameters('location')]",
+          "name": "AllowAllWindowsAzureIps",
+          "properties": {
+            "endIpAddress": "0.0.0.0",
+            "startIpAddress": "0.0.0.0"
+          },
+          "type": "firewallrules"
+        }
+      ],
+      "type": "Microsoft.Sql/servers"
     }
   ],
   "outputs": {

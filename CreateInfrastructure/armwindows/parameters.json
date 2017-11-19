@@ -15,10 +15,10 @@
       "value": "Standard_D4s_v3"
     },
     "adminUsername": {
-      "value": "adminusername"
+      "value": ""
     },
     "adminPassword": {
-      "value": "adminpassword"
+      "value": ""
     },
     "virtualNetworkName": {
       "value": "vnet-REPLACE_NAME"
@@ -48,7 +48,7 @@
       "value": "Basic"
     },
     "rdpIpAddress": {
-      "value": "1.2.3.4"
+      "value": ""
     },
     "osDiskSizeGB": {
       "value": "512"

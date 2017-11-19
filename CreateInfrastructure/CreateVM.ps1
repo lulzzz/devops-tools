@@ -6,24 +6,24 @@ function Main($mainargs)
     if (!$mainargs -or (($mainargs.Length -ne 4) -and ($mainargs.Length -ne 5)))
     {
         Log ("Script for creating infrastructure from arm template.")
-        Log ("Usage: powershell .\CreateInfrastructure.ps1 <subscription> <name> <username> [resourcegroup]")
+        Log ("Usage: powershell .\CreateVM.ps1 <templatefolder> <subscription> <name> <username> [resourcegroup]")
         exit 1
     }
-
-    [string] $subscriptionName = $mainargs[0]
-    [string] $name = $mainargs[1]
-    [string] $username = $mainargs[2]
+    
+    [string] $templateFolder = $mainargs[0]
+    [string] $subscriptionName = $mainargs[1]
+    [string] $name = $mainargs[2]
+    [string] $username = $mainargs[3]
     [string] $resourceGroupName = $null
-    if ($mainargs.Count -eq 4)
+    if ($mainargs.Count -eq 5)
     {
-        [string] $resourceGroupName = $mainargs[3]
+        [string] $resourceGroupName = $mainargs[4]
     }
     else
     {
         [string] $resourceGroupName = "Group-" + $name
     }
     [string] $location = "West Europe"
-    [string] $templateFolder = "armwindows"
     [string] $templateFile = Join-Path $name "template.json"
     [string] $parametersFile = Join-Path $name "parameters.json"
 

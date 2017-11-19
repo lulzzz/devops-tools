@@ -12,12 +12,12 @@
       "value": "vm-REPLACE_NAME"
     },
     "virtualMachineSize": {
-      "value": "Standard_DS11_v2"
+      "value": "Standard_D4s_v3"
     },
     "adminUsername": {
       "value": ""
     },
-    "adminPublicKey": {
+    "adminPassword": {
       "value": ""
     },
     "virtualNetworkName": {
@@ -30,31 +30,40 @@
       "value": "nsg-REPLACE_NAME"
     },
     "addressPrefix": {
-      "value": "10.1.4.0/24"
+      "value": "10.0.1.0/24"
     },
     "subnetName": {
       "value": "default"
     },
     "subnetPrefix": {
-      "value": "10.1.4.0/24"
+      "value": "10.0.1.0/24"
     },
     "publicIpAddressName": {
       "value": "pip-REPLACE_NAME"
     },
     "publicIpAddressType": {
-      "value": "Dynamic"
+      "value": "Static"
     },
     "publicIpAddressSku": {
       "value": "Basic"
     },
-    "sshIpAddress": {
+    "rdpIpAddress": {
       "value": ""
     },
     "osDiskSizeGB": {
-      "value": "32"
+      "value": "512"
     },
     "osDiskName": {
       "value": "disk-REPLACE_NAME"
+    },
+    "sqlServerName": {
+      "value": "sql-REPLACE_NAME"
+    },
+    "sqlAdministratorUsername": {
+      "value": ""
+    },
+    "sqlAdministratorPassword": {
+      "value": ""
     }
   }
 }
