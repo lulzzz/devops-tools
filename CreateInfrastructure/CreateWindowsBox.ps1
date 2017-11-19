@@ -6,18 +6,17 @@ function Main($mainargs)
     if (!$mainargs -or (($mainargs.Length -ne 4) -and ($mainargs.Length -ne 5)))
     {
         Log ("Script for creating infrastructure from arm template.")
-        Log ("Usage: powershell .\CreateInfrastructure.ps1 <subscription> <name> <username> <password> [resourcegroup]")
+        Log ("Usage: powershell .\CreateInfrastructure.ps1 <subscription> <name> <username> [resourcegroup]")
         exit 1
     }
 
     [string] $subscriptionName = $mainargs[0]
     [string] $name = $mainargs[1]
     [string] $username = $mainargs[2]
-    [string] $password = $mainargs[3]
     [string] $resourceGroupName = $null
-    if ($mainargs.Count -eq 5)
+    if ($mainargs.Count -eq 4)
     {
-        [string] $resourceGroupName = $mainargs[4]
+        [string] $resourceGroupName = $mainargs[3]
     }
     else
     {
@@ -29,7 +28,7 @@ function Main($mainargs)
     [string] $parametersFile = Join-Path $name "parameters.json"
 
 
-    Create-Files $templateFolder $name $username $password
+    Create-Files $templateFolder $name $username
 
 
     if (!(Test-Path $templateFile))
@@ -64,7 +63,7 @@ function Main($mainargs)
     New-AzureRmResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile $templateFile -TemplateParameterFile $parametersFile
 }
 
-function Create-Files([string] $folder, [string] $newname, [string] $username, [string] $password)
+function Create-Files([string] $folder, [string] $newname, [string] $username)
 {
     if (Test-Path $newname)
     {
@@ -90,7 +89,7 @@ function Create-Files([string] $folder, [string] $newname, [string] $username, [
 
     [string] $filename = Join-Path $newname "parameters.json"
 
-    Update-CredentialsInParametersFile $filename $username $password
+    Update-CredentialsInParametersFile $filename $username
     Update-IpAddressInParametersFile $filename
 }
 
@@ -110,14 +109,14 @@ function Update-JsonFile([string] $infile, [string] $outfile, [string] $newname)
     [IO.File]::WriteAllText($outfile, $pretty)
 }
 
-function Update-CredentialsInParametersFile([string] $filename, [string] $username, [string] $password)
+function Update-CredentialsInParametersFile([string] $filename, [string] $username)
 {
     Log ("Reading: '" + $filename + "'")
     [string] $content = [IO.File]::ReadAllText($filename)
 
     $json = [Newtonsoft.Json.Linq.JToken]::Parse($content)
-    
-    $elements = $json.parameters.Children() | ? { $_.Name.EndsWith("Username") -or $_.Name.EndsWith("username") }
+
+    $elements = $json.parameters.Children() | ? { $_.Name.ToLower().EndsWith("username") }
 
     if ($elements)
     {
@@ -130,18 +129,40 @@ function Update-CredentialsInParametersFile([string] $filename, [string] $userna
         [IO.File]::WriteAllText($filename, $content)
     }
 
-    $elements = $json.parameters.Children() | ? { $_.Name.EndsWith("Password") -or $_.Name.EndsWith("password") }
+    $elements = $json.parameters.Children() | ? { $_.Name.ToLower().EndsWith("password") }
 
     if ($elements)
     {
         $elements | % {
-            $_.value.value = $password
+            $_.value.value = Generate-AlphanumericPassword 24
         }
 
         Log ("Saving: '" + $filename + "'")
         [string] $content = $json.ToString([Newtonsoft.Json.Formatting]::Indented)
         [IO.File]::WriteAllText($filename, $content)
     }
+}
+
+function Generate-AlphanumericPassword([int] $chars, [string] $environmentOverride)
+{
+    if ($environmentOverride -and (Test-Path ("env:\" + $environmentOverride)))
+    {
+        return "env:\" + $environmentOverride
+    }
+
+    Import-Module (Join-Path ([System.Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) "System.Web.dll")
+
+    [string] $password = ""
+    do
+    {
+        [string] $password = [System.Web.Security.Membership]::GeneratePassword($chars,0)
+    }
+    while (($password | ? { ($_.ToCharArray() | ? { ![Char]::IsLetterOrDigit($_) }) }) -or
+        !($password | ? { ($_.ToCharArray() | ? { [Char]::IsUpper($_) }) }) -or
+        !($password | ? { ($_.ToCharArray() | ? { [Char]::IsLower($_) }) }) -or
+        !($password | ? { ($_.ToCharArray() | ? { [Char]::IsDigit($_) }) }));
+
+    return $password
 }
 
 function Update-IpAddressInParametersFile([string] $filename)
