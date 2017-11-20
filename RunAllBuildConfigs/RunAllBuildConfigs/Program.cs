@@ -8,7 +8,6 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace RunAllBuildConfigs
 {
@@ -39,7 +38,7 @@ namespace RunAllBuildConfigs
             if (args.Length != 0)
             {
                 Console.WriteLine(
-@"RunAllBuildConfigs 0.004 - Trigger all builds.
+@"RunAllBuildConfigs 0.005 - Trigger all builds.
 
 Usage: RunAllBuildConfigs.exe
 
