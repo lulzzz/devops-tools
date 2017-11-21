@@ -26,6 +26,7 @@ namespace RunAllBuildConfigs
         {
             public string buildid { get; set; }
             public List<Buildstep> steps { get; set; }
+            public Dictionary<string, string> properties { get; set; }
             public bool DontRun { get; set; }
         }
 
@@ -49,6 +50,7 @@ BuildPassword
 TEAMCITY_BUILD_PROPERTIES_FILE (can retrieve the 3 above: Server, Username, Password)
 
 Optional environment variables:
+BuildAdditionalParameters
 BuildDisableBuildSteps
 BuildDisableBuildStepTypes
 BuildDryRun
@@ -98,6 +100,8 @@ BuildVerbose");
 
             GetCredentials(out string username, out string password);
 
+            Dictionary<string, string> additionalParameters = GetDictionaryEnvironmentVariable("BuildAdditionalParameters", null);
+
             string[] disabledBuildSteps = GetStringArrayEnvironmentVariable("BuildDisableBuildSteps", null);
             string[] disabledBuildStepTypes = GetStringArrayEnvironmentVariable("BuildDisableBuildStepTypes", null);
             string[] excludedBuildConfigs = GetStringArrayEnvironmentVariable("BuildExcludeBuildConfigs", null);
@@ -107,6 +111,11 @@ BuildVerbose");
             {
                 return GetBuildConfigs(server, username, password);
             });
+
+            foreach (Build build in builds)
+            {
+                build.properties = additionalParameters;
+            }
 
             int totalbuilds = builds.Count;
             int totalsteps = builds.Sum(b => b.steps.Count);
@@ -335,6 +344,7 @@ BuildVerbose");
                             {
                                 buildid = buildid,
                                 steps = buildsteps,
+                                properties = new Dictionary<string, string>(),
                                 DontRun = false
                             });
                         }
@@ -469,6 +479,41 @@ BuildVerbose");
             return returnValues;
         }
 
+        static Dictionary<string, string> GetDictionaryEnvironmentVariable(string variableName, Dictionary<string, string> defaultValues)
+        {
+            Dictionary<string, string> returnValues;
+
+            string stringValue = Environment.GetEnvironmentVariable(variableName);
+            if (stringValue == null)
+            {
+                returnValues = defaultValues;
+                if (returnValues == null)
+                {
+                    Log($"Environment variable not specified: '{variableName}', using: <null>");
+                }
+                else
+                {
+                    Log($"Environment variable not specified: '{variableName}', using: {string.Join(", ", returnValues.Select(v => $"{v.Key}='{v.Value}'"))}");
+                }
+            }
+            else
+            {
+                string[] values = stringValue.Split(',');
+
+                foreach (string v in values.Where(v => !v.Contains('=')))
+                {
+                    Log($"Ignoring malformed environment variable ({variableName}): {v}");
+                }
+
+                values = values.Where(v => v.Contains('=')).ToArray();
+
+                returnValues = values.ToDictionary(v => v.Split('=')[0], v => v.Split('=')[1]);
+                Log($"Got environment variable: '{variableName}', value: '{string.Join(", ", returnValues.Select(v => $"{v.Key}='{v.Value}'"))}'");
+            }
+
+            return returnValues;
+        }
+
         static void TriggerBuilds(string server, string username, string password, List<Build> builds, bool dryRun)
         {
             List<string> buildnames = new List<string>();
@@ -492,7 +537,16 @@ BuildVerbose");
                             PutPlainTextContent(client, stepAddress, "true", "BuildDebug4", build.DontRun || dryRun);
                         }
 
-                        string buildContent = $"<build><buildType id='{build.buildid}'/></build>";
+                        string propertiesstring = string.Empty;
+                        if (build.properties.Count() > 0)
+                        {
+                            propertiesstring = string.Join(string.Empty,
+                                build.properties.Select(p => $"<property name='{p.Key}' value='{p.Value}'/>"));
+
+                            propertiesstring = $"<properties>{propertiesstring}</properties>";
+                        }
+
+                        string buildContent = $"<build><buildType id='{build.buildid}'/>{propertiesstring}</build>";
                         string buildAddress = $"{server}/app/rest/buildQueue";
                         LogColor($"Triggering build: {build.buildid}", ConsoleColor.Magenta);
                         dynamic queueResult = PostXmlContent(client, buildAddress, buildContent, "BuildDebug5", build.DontRun || dryRun);
