@@ -502,7 +502,7 @@ BuildVerbose");
 
                 foreach (string v in values.Where(v => !v.Contains('=')))
                 {
-                    Log($"Ignoring malformed environment variable ({variableName}): {v}");
+                    LogColor($"Ignoring malformed environment variable ({variableName}): '{v}'", ConsoleColor.Yellow);
                 }
 
                 values = values.Where(v => v.Contains('=')).ToArray();
