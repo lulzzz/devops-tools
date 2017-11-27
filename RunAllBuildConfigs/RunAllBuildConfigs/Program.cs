@@ -36,7 +36,7 @@ namespace RunAllBuildConfigs
         static int Main(string[] args)
         {
             int result = 0;
-            if (args.Length != 0)
+            if (args.Length != 0 && (args.Length != 1 || !args[0].StartsWith("@")))
             {
                 Console.WriteLine(
 @"RunAllBuildConfigs 0.005 - Trigger all builds.
