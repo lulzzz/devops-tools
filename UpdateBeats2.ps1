@@ -20,8 +20,14 @@ function InstallBeatagent([string] $beatname)
 
 function SaveOldConfigFile([string] $beatname)
 {
-    [string] $folder = "C:\ProgramData\chocolatey\lib\" + $beatname
+    [string] $folder = Join-Path $env:ProgramData ("chocolatey\lib\" + $beatname)
     [string] $pattern = $beatname + ".yml"
+    if (!(Test-Path $folder))
+    {
+        Log ("Didn't find any existing installation.") Yellow
+        return
+    }
+
     $files = @(dir -Recurse $folder -Include $pattern)
     if ($files.Count -eq 0)
     {
@@ -50,11 +56,11 @@ function ReinstallBeatagent([string] $beatname)
     Log ("Uninstalling: '" + $beatname + "'")
     choco uninstall $beatname -y -f
 
-    [string] $folder = "C:\ProgramData\" + $beatname
+    [string] $folder = Join-Path $env:ProgramData $beatname
     Log ("Deleting folder: '" + $folder + "'")
     rd -recurse -force $folder -ErrorAction SilentlyContinue
 
-    [string] $folder = "C:\ProgramData\chocolatey\lib\" + $beatname
+    [string] $folder = Join-Path $env:ProgramData ("chocolatey\lib\" + $beatname)
     Log ("Deleting folder: '" + $folder + "'")
     rd -recurse -force $folder -ErrorAction SilentlyContinue
 
@@ -64,7 +70,7 @@ function ReinstallBeatagent([string] $beatname)
 
 function RestoreConfigFile([string] $beatname)
 {
-    [string] $folder = "C:\ProgramData\chocolatey\lib\" + $beatname
+    [string] $folder = Join-Path $env:ProgramData ("chocolatey\lib\" + $beatname)
     [string] $pattern = $beatname + ".yml"
     $files = @(dir -Recurse $folder -Include $pattern)
     if ($files.Count -ne 1)
@@ -92,6 +98,9 @@ function RestoreConfigFile([string] $beatname)
 
     Log ("Moving: '" + $source + "' -> '" + $target + "'")
     move $source $target
+
+    Log ("Staring service: '" + $beatname + "'")
+    Start-Service $beatname
 }
 
 function Log([string] $message, $color)
