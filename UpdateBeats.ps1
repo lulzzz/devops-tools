@@ -155,11 +155,22 @@ function Get-Agents([string[]] $beatServers, [string[]] $beatEnvironments, [stri
         if (Test-Path $customscript)
         {
             Log ("Reading custom script: '" + $customscript + "'")
-            $agent.customscript = gc $customscript
+            $agent.customscript = [IO.File]::ReadAllText((Join-Path (pwd).Path $customscript))
         }
         else
         {
             $agent.customscript = $null
+        }
+
+        [string] $customconfig = $agent.name + ".yml"
+        if (Test-Path $customconfig)
+        {
+            Log ("Reading custom config: '" + $customconfig + "'")
+            $agent.customconfig = [IO.File]::ReadAllText((Join-Path (pwd).Path $customconfig))
+        }
+        else
+        {
+            $agent.customconfig = $null
         }
 
         $agent.startservice = $startServices
@@ -235,6 +246,18 @@ function Get-ServerGroups()
     return $serverGroups
 }
 
+function Get-Length([string] $text)
+{
+    if ($text)
+    {
+        return $text.Length
+    }
+    else
+    {
+        return "<null>"
+    }
+}
+
 function Setup-Environment([bool] $installLocal, [bool] $startServices,
     [string[]] $beatServers, [string[]] $beatEnvironments, [string[]] $beatUsernames, [string[]] $beatPasswords)
 {
@@ -255,14 +278,15 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
 
     $agents = @(Get-Agents $beatServers $beatEnvironments $beatUsernames $beatPasswords $startServices)
 
-    Log ("Names:        '" + (($agents | % { $_.name }) -join "', '") + "'")
-    Log ("Urls:         '" + (($agents | % { $_.url }) -join "', '") + "'")
-    Log ("Servers:      '" + (($agents | % { $_.server }) -join "', '") + "'")
-    Log ("Environments: '" + (($agents | % { $_.environment }) -join "', '") + "'")
-    Log ("Usernames:    '" + (($agents | % { $_.username }) -join "', '") + "'")
-    Log ("Passwords:    '" + (($agents | % { $_.password }) -join "', '") + "'")
-    Log ("Customscript: '" + (($agents | % { $_.customscript }) -join "', '") + "'")
-    Log ("Startservice: '" + (($agents | % { $_.startservice }) -join "', '") + "'")
+    Log ("Names:                 '" + (($agents | % { $_.name }) -join "', '") + "'")
+    Log ("Urls:                  '" + (($agents | % { $_.url }) -join "', '") + "'")
+    Log ("Servers:               '" + (($agents | % { $_.server }) -join "', '") + "'")
+    Log ("Environments:          '" + (($agents | % { $_.environment }) -join "', '") + "'")
+    Log ("Usernames:             '" + (($agents | % { $_.username }) -join "', '") + "'")
+    Log ("Passwords (length):    " + (($agents | % { Get-Length $_.password }) -join ", "))
+    Log ("Customconfig (length): " + (($agents | % { Get-Length $_.customconfig }) -join ", "))
+    Log ("Customscript (length): " + (($agents | % { Get-Length $_.customscript }) -join ", "))
+    Log ("Startservice:          " + (($agents | % { $_.startservice }) -join ", "))
 
 
 
@@ -450,7 +474,9 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
         function Download-Files($agents)
         {
             [string] $folder = "C:\install"
+            Robust-Delete $folder
 
+            [string] $folder = "C:\beatinstall"
             Robust-Delete $folder
 
             Log ("Creating folder: '" + $folder + "'")
@@ -511,14 +537,25 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
                 [string] $target = Join-Path $agents[$i].name ($agents[$i].name + "_old.yml")
                 Log ("Copying: '" + $configfile + "' -> '" + $target + "'")
                 copy $configfile $target
-                
+
                 [string] $beatname        = $agents[$i].name
                 [string] $beatServer      = $agents[$i].server
                 [string] $beatEnvironment = $agents[$i].environment
                 [string] $beatUsername    = $agents[$i].username
                 [string] $beatPassword    = $agents[$i].password
+                [string] $customConfig    = $agents[$i].customconfig
 
-                if ($beatServer -or $beatEnvironment -or $beatUsername -or $beatPassword)
+                if ($customConfig)
+                {
+                    Log ("Saving custom config file: '" + $configfile + "'")
+                    [IO.File]::WriteAllText((Join-Path (pwd).Path $configfile), $customConfig)
+
+                    if ($beatServer -or $beatEnvironment -or $beatUsername -or $beatPassword)
+                    {
+                        Update-ConfigFile $configfile $beatServer $beatEnvironment $beatUsername $beatPassword
+                    }
+                }
+                elseif ($beatServer -or $beatEnvironment -or $beatUsername -or $beatPassword)
                 {
                     Update-ConfigFile $configfile $beatServer $beatEnvironment $beatUsername $beatPassword
                 }
@@ -578,14 +615,14 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
                 popd
             }
         }
-        
+
         function Run-CustomScript($agents)
         {
             for ([int] $i=0; $i -lt $agents.Count; $i++)
             {
                 if ($agents[$i].customscript)
                 {
-                    [string[]] $customscript = $agents.customscript
+                    [string] $customscript = $agents.customscript
                     [string] $beatname = $agents[$i].name
 
                     [string] $folder = Join-Path $env:ProgramFiles $beatname
@@ -597,8 +634,9 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
                     Log ("Current dir: '" + [System.IO.Directory]::GetCurrentDirectory() + "'")
 
                     [string] $scriptfile = Join-Path "." "customscript.ps1"
-                    Log ("Savings custom script: '" + $scriptfile + "'")
-                    $customscript | sc $scriptfile
+                    Log ("Saving custom script: '" + $scriptfile + "'")
+                    [IO.File]::WriteAllText((Join-Path (pwd).Path $scriptfile), $customscript)
+
 
                     Log ("Running custom script: '" + $scriptfile + "'")
                     &$scriptfile
