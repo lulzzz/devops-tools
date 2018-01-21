@@ -27,16 +27,22 @@ function Main($mainArgs)
 
     $parsedArgs = @($mainArgs)
     [bool] $installLocal = $false
+    [bool] $startServices = $true
 
     if ($parsedArgs -contains "-InstallLocal")
     {
         [bool] $installLocal = $true
         $parsedArgs = @($parsedArgs | ? { $_ -ne "-InstallLocal" })
     }
+    if ($parsedArgs -contains "-DontStartServices")
+    {
+        [bool] $startServices = $false
+        $parsedArgs = @($parsedArgs | ? { $_ -ne "-DontStartServices" })
+    }
 
     if ($parsedArgs -and $parsedArgs.Count -ne 0 -and $parsedArgs.Count -ne 4)
     {
-        Log ("Usage: powershell .\UpdateBeats.ps1 [-InstallLocal] <elasticservers> <environments> <usernames> <passwords>") Red
+        Log ("Usage: powershell .\UpdateBeats.ps1 [-InstallLocal] [-DontStartServices] <elasticservers> <environments> <usernames> <passwords>") Red
         Log ("") Red
         Log ("Each parameter can be a single value or a comma separated array of values") Red
         Log ("matching the agents to be installed. If the 4 parameters are not specified") Red
@@ -61,12 +67,12 @@ function Main($mainArgs)
         [string[]] $beatPasswords = $null
     }
 
-    Setup-Environment $installLocal $beatServers $beatEnvironments $beatUsernames $beatPasswords
+    Setup-Environment $installLocal $startServices $beatServers $beatEnvironments $beatUsernames $beatPasswords
 
     Log ("Done: " + $totalWatch.Elapsed)
 }
 
-function Get-Agents([string[]] $beatServers, [string[]] $beatEnvironments, [string[]] $beatUsernames, [string[]] $beatPasswords)
+function Get-Agents([string[]] $beatServers, [string[]] $beatEnvironments, [string[]] $beatUsernames, [string[]] $beatPasswords, [bool] $startServices)
 {
     [string] $filename = "agents.txt"
     if (!(Test-Path $filename))
@@ -156,6 +162,8 @@ function Get-Agents([string[]] $beatServers, [string[]] $beatEnvironments, [stri
             $agent.customscript = $null
         }
 
+        $agent.startservice = $startServices
+
         $agents += $agent
     }
 
@@ -227,8 +235,11 @@ function Get-ServerGroups()
     return $serverGroups
 }
 
-function Setup-Environment([bool] $installLocal, [string[]] $beatServers, [string[]] $beatEnvironments, [string[]] $beatUsernames, [string[]] $beatPasswords)
+function Setup-Environment([bool] $installLocal, [bool] $startServices,
+    [string[]] $beatServers, [string[]] $beatEnvironments, [string[]] $beatUsernames, [string[]] $beatPasswords)
 {
+    Log ("InstallLocal:  " + $installLocal)
+
     if (!$installLocal)
     {
         $serverGroups = @(Get-ServerGroups)
@@ -242,7 +253,7 @@ function Setup-Environment([bool] $installLocal, [string[]] $beatServers, [strin
         }
     }
 
-    $agents = @(Get-Agents $beatServers $beatEnvironments $beatUsernames $beatPasswords)
+    $agents = @(Get-Agents $beatServers $beatEnvironments $beatUsernames $beatPasswords $startServices)
 
     Log ("Names:        '" + (($agents | % { $_.name }) -join "', '") + "'")
     Log ("Urls:         '" + (($agents | % { $_.url }) -join "', '") + "'")
@@ -251,6 +262,7 @@ function Setup-Environment([bool] $installLocal, [string[]] $beatServers, [strin
     Log ("Usernames:    '" + (($agents | % { $_.username }) -join "', '") + "'")
     Log ("Passwords:    '" + (($agents | % { $_.password }) -join "', '") + "'")
     Log ("Customscript: '" + (($agents | % { $_.customscript }) -join "', '") + "'")
+    Log ("Startservice: '" + (($agents | % { $_.startservice }) -join "', '") + "'")
 
 
 
@@ -602,8 +614,15 @@ function Setup-Environment([bool] $installLocal, [string[]] $beatServers, [strin
             {
                 [string] $servicename = $agents[$i].name
 
-                Log ("Starting service: '" + $servicename + "'")
-                Start-Service $servicename
+                if ($agents[$i].startservice)
+                {
+                    Log ("Starting service: '" + $servicename + "'")
+                    Start-Service $servicename
+                }
+                else
+                {
+                    Log ("Not starting service: '" + $servicename + "'")
+                }
             }
         }
 
