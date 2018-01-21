@@ -497,26 +497,16 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
 
         function Extract-Files($agents)
         {
-            [string] $zipexe = Join-Path (Join-Path $env:ProgramFiles "7-Zip") "7z.exe"
-            if (!(Test-Path $zipexe))
-            {
-                Log ("Couldn't find 7-Zip: '" + $zipexe + "'") Red
-                exit 1
-            }
-
-            Set-Alias zip $zipexe
+            [string] $dllpath = Join-Path $env:windir "Microsoft.NET\Framework64\v4.0.30319\System.IO.Compression.FileSystem.dll"
+            Log ("Loading assembly: '" + $dllpath + "'")
+            Add-Type -Path $dllpath
 
             for ([int] $i=0; $i -lt $agents.Count; $i++)
             {
                 [string] $filename = $agents[$i].name + ".zip"
 
                 Log ("Extracting zip file: '" + $filename + "'")
-                zip x $filename
-                if (!$?)
-                {
-                    Log ("Couldn't extract zip file: '" + $filename + "': " + $LastExitCode) Red
-                    exit 1
-                }
+                [System.IO.Compression.ZipFile]::ExtractToDirectory($filename, ".")
 
                 [string[]] $folders = @(dir ($agents[$i].name + "*") -Directory)
                 if ($folders.Count -ne 1)
