@@ -1,22 +1,29 @@
-# This script will install Elastic Beat agents on remote servers.
-# Requires 2 files:
-# agents.txt - Each line specifies a beat agent to install: The windows service
-#              name and the download url.
-# creds.txt  - Each line contains a group of servers sharing powershell remoting
-#              credentials: hostnames/ips, username and (optional) encrypted password.
-#
-# I.e. If you want to install two beat agents, and have two groups of servers,
-# the files could look something like this:
-# agents.txt:
-# metricbeat https://domain/metricbeat.zip
-# winlogbeat https://domain/winlogbeat.zip
-# creds.txt:
-# 10.0.0.1,10.0.0.2 myuser1 01000000...
-# 10.0.1.1,10.0.1.2 myuser2 01000000...
-#
-# The password string must be encrypted at the machine and by the user who executes
-# this script, using the following command:
-# Read-Host -AsSecureString | ConvertFrom-SecureString
+<#
+.SYNOPSIS
+This script will install Elastic Beat agents on remote servers.
+
+.DESCRIPTION
+For actual usage, run this script with the -usage parameter.
+
+Requires 2 files:
+agents.txt - Each line specifies a beat agent to install: The windows service
+             name and the download url.
+creds.txt  - Each line contains a group of servers sharing powershell remoting
+             credentials: hostnames/ips, username and (optional) encrypted password.
+
+I.e. If you want to install two beat agents, and have two groups of servers,
+the files could look something like this:
+agents.txt:
+metricbeat https://domain/metricbeat.zip
+winlogbeat https://domain/winlogbeat.zip
+creds.txt:
+10.0.0.1,10.0.0.2 myuser1 01000000...
+10.0.1.1,10.0.1.2 myuser2 01000000...
+
+The password string must be encrypted at the machine and by the user who executes
+this script, using the following command:
+Read-Host -AsSecureString | ConvertFrom-SecureString
+#>
 
 Set-StrictMode -v latest
 $ErrorActionPreference = "Stop"
@@ -67,7 +74,15 @@ function Main($mainArgs)
         [string[]] $beatPasswords = $null
     }
 
-    Setup-Environment $installLocal $startServices $beatServers $beatEnvironments $beatUsernames $beatPasswords
+    try
+    {
+        Setup-Environment $installLocal $startServices $beatServers $beatEnvironments $beatUsernames $beatPasswords
+    }
+    catch
+    {
+        Log ($_.Exception.ToString()) Red
+        exit 1
+    }
 
     Log ("Done: " + $totalWatch.Elapsed)
 }
@@ -77,8 +92,7 @@ function Get-Agents([string[]] $beatServers, [string[]] $beatEnvironments, [stri
     [string] $filename = "agents.txt"
     if (!(Test-Path $filename))
     {
-        Log ("File not found: '" + $filename + "'") Red
-        exit 1
+        throw ("File not found: '" + $filename + "'")
     }
 
     [string[]] $rows = gc $filename | ? { !$_.StartsWith("#") }
@@ -186,8 +200,7 @@ function Get-ServerGroups()
     [string] $filename = "creds.txt"
     if (!(Test-Path $filename))
     {
-        Log ("File not found: '" + $filename + "'") Red
-        exit 1
+        throw ("File not found: '" + $filename + "'")
     }
 
     [string[]] $rows = gc $filename | ? { !$_.StartsWith("#") }
@@ -220,8 +233,7 @@ function Get-ServerGroups()
                 }
                 catch
                 {
-                    Log ("Credentials not specified: " + $_.Exception.ToString()) Red
-                    exit 1
+                    throw ("Credentials not specified: " + $_.Exception.ToString())
                 }
             }
             else
@@ -232,8 +244,7 @@ function Get-ServerGroups()
                 }
                 catch
                 {
-                    Log ("Credentials not specified: " + $_.Exception.ToString()) Red
-                    exit 1
+                    throw ("Credentials not specified: " + $_.Exception.ToString())
                 }
             }
 
@@ -331,8 +342,7 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
                 }
                 if (Test-Path $folder)
                 {
-                    Log ("Couldn't delete folder: '" + $folder + "'") Red
-                    exit 1
+                    throw ("Couldn't delete folder: '" + $folder + "'")
                 }
             }
         }
@@ -361,8 +371,7 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
             }
             if (!(Test-Path $filename) -or (dir $filename).Length -eq 0)
             {
-                Log ("Couldn't download file: '" + $filename + "'") Red
-                exit 1
+                throw ("Couldn't download file: '" + $filename + "'")
             }
         }
 
@@ -395,8 +404,7 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
                 }
                 if ((Get-Service $servicename).Status -ne "Stopped")
                 {
-                    Log ("Couldn't stop service: '" + $servicename + "'") Red
-                    exit 1
+                    throw ("Couldn't stop service: '" + $servicename + "'")
                 }
             }
         }
@@ -411,8 +419,7 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
             }
             if (!(Test-Path $target))
             {
-                Log ("Couldn't move: '" + $source + "' -> '" + $target + "'") Red
-                exit 1
+                throw ("Couldn't move: '" + $source + "' -> '" + $target + "'")
             }
         }
 
@@ -511,8 +518,7 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
                 [string[]] $folders = @(dir ($agents[$i].name + "*") -Directory)
                 if ($folders.Count -ne 1)
                 {
-                    Log ("Couldn't extract zip file: '" + $filename + "': Found " + $folders.Count + " subfolders.") Red
-                    exit 1
+                    throw ("Couldn't extract zip file: '" + $filename + "': Found " + $folders.Count + " subfolders.")
                 }
 
                 [string] $folder = $folders[0]
@@ -576,8 +582,7 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
                     sc.exe delete $beatname
                     if (!$?)
                     {
-                        Log ("Couldn't delete service: '" + $beatname + "'") Red
-                        exit 1
+                        throw ("Couldn't delete service: '" + $beatname + "'")
                     }
                 }
 
