@@ -50,7 +50,7 @@ function Main()
 
 
     $instanceids | % {
-        [string] $arraffinity = $_
+        [string] $arraffinity = "ARRAffinity=" + $_
 
         [string] $url = $siteurl + "/api/v1/heartbeat"
         $result = curl.exe $url `
