@@ -272,7 +272,7 @@ function Get-Length([string] $text)
 function Setup-Environment([bool] $installLocal, [bool] $startServices,
     [string[]] $beatServers, [string[]] $beatEnvironments, [string[]] $beatUsernames, [string[]] $beatPasswords)
 {
-    Log ("InstallLocal:  " + $installLocal)
+    Log ("InstallLocal: " + $installLocal)
 
     if (!$installLocal)
     {
@@ -486,6 +486,9 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
             [string] $folder = "C:\beatinstall"
             Robust-Delete $folder
 
+            [string] $folder = "C:\beat"
+            Robust-Delete $folder
+
             Log ("Creating folder: '" + $folder + "'")
             md $folder | Out-Null
 
@@ -671,6 +674,9 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
             Install-Beatagents $agents
 
             Run-CustomScript $agents
+
+            [string] $folder = "C:\beat"
+            Robust-Delete $folder
 
             Start-Services $agents
         }
