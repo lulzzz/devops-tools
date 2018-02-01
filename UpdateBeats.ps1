@@ -480,21 +480,7 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
 
         function Download-Files($agents)
         {
-            [string] $folder = "C:\install"
-            Robust-Delete $folder
-
-            [string] $folder = "C:\beatinstall"
-            Robust-Delete $folder
-
-            [string] $folder = "C:\beat"
-            Robust-Delete $folder
-
-            Log ("Creating folder: '" + $folder + "'")
-            md $folder | Out-Null
-
-
-            cd $folder
-            [System.IO.Directory]::SetCurrentDirectory((pwd).Path)
+            [string] $folder = (pwd).Path
 
             for ([int] $i=0; $i -lt $agents.Count; $i++)
             {
@@ -611,6 +597,7 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
                 &$scriptfile
 
                 popd
+                [System.IO.Directory]::SetCurrentDirectory((pwd).Path)
             }
         }
 
@@ -640,6 +627,7 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
                     &$scriptfile
 
                     popd
+                    [System.IO.Directory]::SetCurrentDirectory((pwd).Path)
                 }
             }
         }
@@ -668,6 +656,19 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
 
         try
         {
+            [string] $folder = "C:\install"
+            Robust-Delete $folder
+
+            [string] $folder = "C:\beatinstall"
+            Robust-Delete $folder
+
+            Log ("Creating folder: '" + $folder + "'")
+            md $folder | Out-Null
+
+            pushd
+            cd $folder
+            [System.IO.Directory]::SetCurrentDirectory((pwd).Path)
+
             Download-Files $agents
             Extract-Files $agents
 
@@ -675,10 +676,11 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
 
             Run-CustomScript $agents
 
-            [string] $folder = "C:\beat"
-            Robust-Delete $folder
-
             Start-Services $agents
+
+            popd
+            [System.IO.Directory]::SetCurrentDirectory((pwd).Path)
+            Robust-Delete $folder
         }
         catch
         {
