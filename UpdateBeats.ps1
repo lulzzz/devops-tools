@@ -32,51 +32,20 @@ function Main($mainArgs)
 {
     [Diagnostics.Stopwatch] $totalWatch = [Diagnostics.Stopwatch]::StartNew()
 
-    $parsedArgs = @($mainArgs)
-    [bool] $installLocal = $false
-    [bool] $startServices = $true
-
-    if ($parsedArgs -contains "-InstallLocal")
+    $parsedArgs = Parse-Args $mainargs # b/c powershell's own argument parser has caused me nothing but PAIN.
+    if (!$parsedArgs)
     {
-        [bool] $installLocal = $true
-        $parsedArgs = @($parsedArgs | ? { $_ -ne "-InstallLocal" })
-    }
-    if ($parsedArgs -contains "-DontStartServices")
-    {
-        [bool] $startServices = $false
-        $parsedArgs = @($parsedArgs | ? { $_ -ne "-DontStartServices" })
-    }
-
-    if ($parsedArgs -and $parsedArgs.Count -ne 0 -and $parsedArgs.Count -ne 4)
-    {
-        Log ("Usage: powershell .\UpdateBeats.ps1 [-InstallLocal] [-DontStartServices] <elasticservers> <environments> <usernames> <passwords>") Red
+        Log ("Usage: powershell .\UpdateBeats.ps1 [-InstallLocal] [-DontStartServices] -s <elasticservers> -e <environments> -u <usernames> -p <passwords>") Red
         Log ("") Red
         Log ("Each parameter can be a single value or a comma separated array of values") Red
-        Log ("matching the agents to be installed. If the 4 parameters are not specified") Red
-        Log ("previous .yml files for existing beat agents will be reused.") Red
+        Log ("matching the agents to be installed. If any of the 4 parameters are not") Red
+        Log ("specified .yml files from existing beat agents will be reused.") Red
         exit 1
-    }
-
-
-    if ($parsedArgs -and $parsedArgs.Count -eq 4)
-    {
-        [string[]] $beatServers = $parsedArgs[0].Split(",")
-        [string[]] $beatEnvironments = $parsedArgs[1].Split(",")
-        [string[]] $beatUsernames = $parsedArgs[2].Split(",")
-        [string[]] $beatPasswords = $parsedArgs[3].Split(",")
-    }
-    else
-    {
-        Log ("Reusing old configuration files.")
-        [string[]] $beatServers = $null
-        [string[]] $beatEnvironments = $null
-        [string[]] $beatUsernames = $null
-        [string[]] $beatPasswords = $null
     }
 
     try
     {
-        Setup-Environment $installLocal $startServices $beatServers $beatEnvironments $beatUsernames $beatPasswords
+        Setup-Environment $parsedArgs.installLocal $parsedArgs.startServices $parsedArgs.beatServers $parsedArgs.beatEnvironments $parsedArgs.beatUsernames $parsedArgs.beatPasswords
     }
     catch
     {
@@ -85,6 +54,89 @@ function Main($mainArgs)
     }
 
     Log ("Done: " + $totalWatch.Elapsed)
+}
+
+function Parse-Args([string[]] $mainArgs)
+{
+    $parsedArgs = $mainArgs
+    $resultArgs = @{}
+
+    if ($parsedArgs -contains "-InstallLocal")
+    {
+        $resultArgs.installLocal = $true
+        $parsedArgs = @($parsedArgs | ? { $_ -ne "-InstallLocal" })
+    }
+    else
+    {
+        $resultArgs.installLocal = $false
+    }
+    if ($parsedArgs -contains "-DontStartServices")
+    {
+        $resultArgs.startServices = $false
+        $parsedArgs = @($parsedArgs | ? { $_ -ne "-DontStartServices" })
+    }
+    else
+    {
+        $resultArgs.startServices = $true
+    }
+
+    
+    [int] $offset = $parsedArgs.IndexOf("-s")
+    if ($offset -ge 0 -and $offset -lt $parsedArgs.Count-1)
+    {
+        $resultArgs.beatServers = $parsedArgs[$offset+1].Split(",")
+        $parsedArgs = @($parsedArgs | select -First $offset -Last ($parsedArgs.Count-$offset-2))
+    }
+    else
+    {
+        Log ("Reusing servers from old configuration files.")
+        $resultArgs.beatServers = $null
+    }
+
+    [int] $offset = $parsedArgs.IndexOf("-e")
+    if ($offset -ge 0 -and $offset -lt $parsedArgs.Count-1)
+    {
+        $resultArgs.beatEnvironments = $parsedArgs[$offset+1].Split(",")
+        $parsedArgs = @($parsedArgs | select -First $offset -Last ($parsedArgs.Count-$offset-2))
+    }
+    else
+    {
+        Log ("Reusing environments from old configuration files.")
+        $resultArgs.beatEnvironments = $null
+    }
+
+    [int] $offset = $parsedArgs.IndexOf("-u")
+    if ($offset -ge 0 -and $offset -lt $parsedArgs.Count-1)
+    {
+        $resultArgs.beatUsernames = @($parsedArgs[$offset+1].Split(","))
+        $parsedArgs = @($parsedArgs | select -First $offset -Last ($parsedArgs.Count-$offset-2))
+    }
+    else
+    {
+        Log ("Reusing usernames from old configuration files.")
+        $resultArgs.beatUsernames = $null
+    }
+
+    [int] $offset = $parsedArgs.IndexOf("-p")
+    if ($offset -ge 0 -and$offset -lt $parsedArgs.Count-1)
+    {
+        $resultArgs.beatPasswords = $parsedArgs[$offset+1].Split(",")
+        $parsedArgs = @($parsedArgs | select -First $offset -Last ($parsedArgs.Count-$offset-2))
+    }
+    else
+    {
+        Log ("Reusing passwords from old configuration files.")
+        $resultArgs.beatPasswords = $null
+    }
+
+
+    if ($parsedArgs.Count -ne 0)
+    {
+        Log ("Args left: '" + $parsedArgs + "'")
+        return $null
+    }
+
+    return $resultArgs
 }
 
 function Get-Agents([string[]] $beatServers, [string[]] $beatEnvironments, [string[]] $beatUsernames, [string[]] $beatPasswords, [bool] $startServices)
@@ -299,8 +351,6 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
     Log ("Customscript (length): " + (($agents | % { Get-Length $_.customscript }) -join ", "))
     Log ("Startservice:          " + (($agents | % { $_.startservice }) -join ", "))
 
-
-
     [ScriptBlock] $installAgents = {
         Set-StrictMode -v latest
         $ErrorActionPreference = "Stop"
@@ -491,7 +541,7 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
             }
         }
 
-        function Extract-Files($agents)
+        function Prepare-Files($agents)
         {
             [string] $dllpath = Join-Path $env:windir "Microsoft.NET\Framework64\v4.0.30319\System.IO.Compression.FileSystem.dll"
             Log ("Loading assembly: '" + $dllpath + "'")
@@ -670,7 +720,7 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
             [System.IO.Directory]::SetCurrentDirectory((pwd).Path)
 
             Download-Files $agents
-            Extract-Files $agents
+            Prepare-Files $agents
 
             Install-Beatagents $agents
 
