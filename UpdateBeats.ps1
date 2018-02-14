@@ -625,9 +625,6 @@ function Setup-Environment([bool] $installLocal, [bool] $startServices,
                     }
                 }
 
-                [string] $folder = Join-Path $env:ProgramData $beatname
-                Robust-Delete $folder
-
                 [string] $folder = Join-Path (Join-Path (Join-Path $env:ProgramData "chocolatey") "lib") $beatname
                 Robust-Delete $folder
 
