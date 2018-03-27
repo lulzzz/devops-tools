@@ -1,44 +1,80 @@
 ﻿using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
+using McMaster.Extensions.CommandLineUtils;
 
 namespace PruneBackups
 {
-    class Program
+    [HelpOption]
+    public class Program
     {
-        static void Main(string[] args)
-        {
-            string path = args.Length > 0 ? args[0] : ".";
+        public static IFileRepository FileRepository = new ServerFileRepository();
+        public static ISystemTime SystemTime = new SystemTime();
+        public static int Main(string[] args)
+             => CommandLineApplication.Execute<Program>(args.Length == 0 ? new [] {"-h"} : args);
 
-            string[] allfiles = Directory.GetFiles(path)
-                .Where(f => Path.GetFileName(f).Length == 34)
+        [Option(Description = "The path of backups")]
+        public string Path { get; }
+
+        [Option(Description = "The maxiumum age of backups")]
+        public int Age { get; } = 60;
+
+        private void OnExecute()
+        {
+            if (!FileRepository.PathExists(Path))
+            {
+                Log($"Path: {Path} . Does not exist");
+                return;
+            }
+              
+            var maximumAge = SystemTime.Now.AddDays(-Age);
+
+            var filesInPath = FileRepository.GetFiles(Path)
+                .Where(HasDateInPath)
                 .ToArray();
 
-            Log($"Found {allfiles.Length} files.");
-
-            var dategroups = allfiles.GroupBy(f => Path.GetFileName(f).Substring(0, 24));
-            Log($"Found {dategroups.Count()} date groups.");
-            foreach (var group in dategroups.OrderBy(g => g.Key))
+            Log($"Found {filesInPath.Length} files in path: {Path}");
+            foreach (var filename in filesInPath)
             {
-                string date = group.Key;
-                string[] datefiles = allfiles.Where(f => Path.GetFileName(f).Substring(0, 24) == date).ToArray();
-                Log($"Found {datefiles.Length} files in group '{date}'");
-
-                string keep = datefiles.OrderBy(f => f).Take(1).Single();
-
-                Log($"Keeping file: '{keep}'");
-
-                foreach (string filename in datefiles.OrderBy(f => f).Skip(1))
+                var createdDate = GetDateCreatedFromFileName(filename);
+                if (createdDate < maximumAge)
                 {
                     Log($"Deleting file: '{filename}'");
-                    File.Delete(filename);
+                    FileRepository.Delete(filename);
+
+                }
+                else
+                {
+                    Log($"Keeping file: '{filename}'");
                 }
             }
         }
 
-        static void Log(string message)
+        private static bool HasDateInPath(string file)
         {
-            string date = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+            return DateRegex.IsMatch(file);
+        }
+
+        private static readonly Regex DateRegex = new Regex("_.\\d+_", RegexOptions.Compiled);
+        private static DateTime GetDateCreatedFromFileName(string file)
+        {
+            var result = DateRegex.Match(file);
+            if (result.Success)
+                return ParseDate(result.Value);
+            return SystemTime.Now.DateTime;
+        }
+
+        public static DateTime ParseDate(string value)
+        {
+            return DateTime.ParseExact(value.Replace("_", string.Empty), "yyyyMMdd",
+                CultureInfo.InvariantCulture, DateTimeStyles.None);
+        }
+
+        private static void Log(string message)
+        {
+            var date = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
             Console.WriteLine($"{date}: {message}");
             File.AppendAllText("prune-backups.log", $"{date}: {message}{Environment.NewLine}");
         }
