@@ -108,5 +108,41 @@ namespace PruneBackups.Tests
             A.CallTo(() => fileserver.GetFiles(A<string>._))
                 .MustNotHaveHappened();
         }
+        [Test]
+        public void When_dryRun_DonNotCall_Delete()
+        {
+            var backuppath = "/backup/path";
+            var fileserver = A.Fake<IFileRepository>();
+            var clock = A.Fake<ISystemTime>();
+            var dateTimeOffset = Program.ParseDate("20170701");
+            A.CallTo(() => clock.Now)
+                .Returns(dateTimeOffset);
+
+            A.CallTo(() => fileserver.PathExists(backuppath))
+                .Returns(true);
+
+
+            var backupsToBeRemoved = new[]
+            {
+                "eventstore_prod_20170401_000000.zip",
+                "eventstore_prod_20170402_000000.zip",
+                "eventstore_prod_20170403_000000.zip",
+                "eventstore_prod_20170404_000000.zip",
+                "eventstore_prod_20170405_000000.zip",
+                "eventstore_prod_20170406_000000.zip"
+            };
+
+            A.CallTo(() => fileserver.GetFiles(backuppath))
+                .Returns(backupsToBeRemoved);
+
+            Program.FileRepository = fileserver;
+            Program.SystemTime = clock;
+
+
+            Program.Main($"--path {backuppath} --age 60 --dry-run".Split(" "));
+
+            A.CallTo(() => fileserver.Delete(A<string>._))
+                .MustNotHaveHappened();
+        }
     }
 }

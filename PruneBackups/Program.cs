@@ -21,6 +21,9 @@ namespace PruneBackups
         [Option(Description = "The maxiumum age of backups")]
         public int Age { get; } = 60;
 
+        [Option(Description = "If prune should be debug default = false")]
+        public bool DryRun { get; }
+
         private void OnExecute()
         {
             if (!FileRepository.PathExists(Path))
@@ -42,7 +45,8 @@ namespace PruneBackups
                 if (createdDate < maximumAge)
                 {
                     Log($"Deleting file: '{filename}'");
-                    FileRepository.Delete(filename);
+                    if(!DryRun)
+                        FileRepository.Delete(filename);
 
                 }
                 else
