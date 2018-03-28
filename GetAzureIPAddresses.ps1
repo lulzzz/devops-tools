@@ -16,6 +16,7 @@ function Main()
 
     $addresses | select id,ipaddress | ogv
 
+    Write-Host ("Press...")
     Read-Host
 }
 
