@@ -7,8 +7,36 @@ using NUnit.Framework;
 
 namespace PruneBackups.Tests
 {
-    public class UnitTest1
+    public class PruneProgramTest
     {
+        [TestCase("sql_migr_20170505_133700.zip", "20170505")]
+        [TestCase("sql_prod_20170626_000001.zip", "20170626")]
+        [TestCase("sql_prod_20170720_000001.zip", "20170720")]
+        [TestCase("eventstore_prod_20170502_000000.zip", "20170502")]
+        [TestCase("eventstore_prod_20170503_000000.zip", "20170503")]
+        [TestCase("eventstore_prod_20170504_000000.zip", "20170504")]
+        [TestCase("eventstore_prod_20170505_000000.zip", "20170505")]
+        [TestCase("eventstore_prod_20170506_000000.zip", "20170506")]
+        public void When_FileIncludes_TimeStamp_Return(string filname, string date)
+        {
+            var actual = Program.GetDateCreatedFromFileName(filname);
+            var expected = Program.ParseDate(date);
+            Assert.AreEqual(expected, actual);
+        }
+
+        [Test]
+        public void WhenParseFail_ReturnDateNow()
+        {
+            Program.SystemTime = A.Fake<ISystemTime>();
+            var expected = DateTime.Parse("2017-01-01");
+            A.CallTo(() => Program.SystemTime.Now)
+                .Returns(expected);
+
+            var actual = Program.GetDateCreatedFromFileName("cannnoteparsetis");
+
+            Assert.AreEqual(expected, actual);
+
+        }
         [Test]
         public void AssertOnlyRemovedinCorrectAge()
         {
@@ -75,7 +103,7 @@ namespace PruneBackups.Tests
 
             Program.FileRepository = fileserver;
 
-            Assert.DoesNotThrow(() => Program.Main($"--path /path/does/not/exist --age 60".Split(" ")));
+            Assert.DoesNotThrow(() => Program.Main("--path /path/does/not/exist --age 60".Split(" ")));
 
             A.CallTo(() => fileserver.GetFiles(A<string>._))
                 .MustNotHaveHappened();

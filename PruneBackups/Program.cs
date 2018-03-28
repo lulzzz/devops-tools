@@ -58,12 +58,13 @@ namespace PruneBackups
         }
 
         private static readonly Regex DateRegex = new Regex("_.\\d+_", RegexOptions.Compiled);
-        private static DateTime GetDateCreatedFromFileName(string file)
+        public static DateTime GetDateCreatedFromFileName(string file)
         {
+            //TODO: get file created from fileInfo
             var result = DateRegex.Match(file);
             if (result.Success)
                 return ParseDate(result.Value);
-            return SystemTime.Now.DateTime;
+            return SystemTime.Now;
         }
 
         public static DateTime ParseDate(string value)

@@ -4,6 +4,6 @@ namespace PruneBackups
 {
     public interface ISystemTime
     {
-        DateTimeOffset Now { get; }
+        DateTime Now { get; }
     }
 }

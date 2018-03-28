@@ -4,6 +4,6 @@ namespace PruneBackups
 {
     public class SystemTime : ISystemTime
     {
-        public DateTimeOffset Now => DateTimeOffset.Now;
+        public DateTime Now => DateTime.Now;
     }
 }
