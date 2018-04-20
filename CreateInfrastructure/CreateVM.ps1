@@ -9,7 +9,7 @@ function Main($mainargs)
         Log ("Usage: powershell .\CreateVM.ps1 <templatefolder> <subscription> <name> <username> [resourcegroup]")
         exit 1
     }
-    
+
     [string] $templateFolder = $mainargs[0]
     [string] $subscriptionName = $mainargs[1]
     [string] $name = $mainargs[2]
@@ -46,7 +46,9 @@ function Main($mainargs)
     Login-AzureRmAccount | Out-Null
 
     Log ("Available subscriptions:")
-    Get-AzureRmSubscription | % { $_.SubscriptionName } | sort | % { Log ("'" + $_ + "'") }
+    Get-AzureRmSubscription | % { $_.Name } | sort | % { Log ("'" + $_ + "'") }
+
+    Log ("Selecting subscription: '" + $subscriptionName + "'")
     Set-AzureRmContext -SubscriptionName $subscriptionName
 
     if ($mainargs.Count -eq 4)
@@ -195,17 +197,17 @@ function Load-Dependencies()
 {
     if ([Environment]::Version.Major -lt 4)
     {
-        Log ("Newtonsoft.Json 10.0.3 requires .net 4 (Powershell 3.0), you have: " + [Environment]::Version) Red
+        Log ("Newtonsoft.Json 11.0.2 requires .net 4 (Powershell 3.0), you have: " + [Environment]::Version) Red
         exit 1
     }
 
-    [string] $nugetpkg = "https://www.nuget.org/api/v2/package/Newtonsoft.Json/10.0.3"
+    [string] $nugetpkg = "https://www.nuget.org/api/v2/package/Newtonsoft.Json/11.0.2"
     [string] $zipfile = Join-Path $env:temp "json.zip"
     [string] $dllfile = "Newtonsoft.Json.dll"
     [string] $zipfilepath = Join-Path (Join-Path $zipfile "lib\net45") $dllfile
     [string] $dllfilepath = Join-Path $env:temp $dllfile
-    
-    [string] $hash = "F33CBE589B769956284868104686CC2D"
+
+    [string] $hash = "5AFDA7C7D4F7085E744C2E7599279DB3"
     if ((Test-Path $dllfilepath) -and (Get-FileHash -Algorithm MD5 $dllfilepath).Hash -eq $hash)
     {
         Log ("File already downloaded: '" + $dllfilepath + "'")
