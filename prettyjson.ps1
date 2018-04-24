@@ -8,8 +8,17 @@ function Main()
     $jsonfiles = @(dir -r -i *.json)
     Log ("Found " + $jsonfiles.Count + " json files.")
 
-    $jsonfiles | % {
-        Pretty-JsonFile $_.FullName
+    for ([int] $i=0; $i -lt $jsonfiles.Count; $i++)
+    {
+        [string] $jsonfile = $jsonfiles[$i].FullName
+        try
+        {
+            Pretty-JsonFile $jsonfile
+        }
+        catch
+        {
+            Log ("Error: " + $_.Exception) Red
+        }
     }
 }
 
@@ -21,39 +30,42 @@ function Load-Dependencies()
         exit 1
     }
 
-    [string] $nugetpkg = "https://www.nuget.org/api/v2/package/Newtonsoft.Json/10.0.3"
+    [string] $nugetpkg = "https://www.nuget.org/api/v2/package/Newtonsoft.Json/11.0.2"
     [string] $zipfile = Join-Path $env:temp "json.zip"
     [string] $dllfile = "Newtonsoft.Json.dll"
     [string] $zipfilepath = Join-Path (Join-Path $zipfile "lib\net45") $dllfile
     [string] $dllfilepath = Join-Path $env:temp $dllfile
 
-    Log ("Downloading: '" + $nugetpkg + "' -> '" + $zipfile + "'")
-    if (Get-Command Invoke-WebRequest -ErrorAction SilentlyContinue)
+    if ((Get-FileHash $dllfilepath -Algorithm "MD5").Hash -ne "F33CBE589B769956284868104686CC2D")
     {
-        Invoke-WebRequest -UseBasicParsing $nugetpkg -OutFile $zipfile
-    }
-    else
-    {
-        curl.exe -L $nugetpkg -o $zipfile
-    }
-    if (!(Test-Path $zipfile))
-    {
-        Log ("Couldn't download: '" + $zipfile + "'") Red
-        exit 1
-    }
+        Log ("Downloading: '" + $nugetpkg + "' -> '" + $zipfile + "'")
+        if (Get-Command Invoke-WebRequest -ErrorAction SilentlyContinue)
+        {
+            Invoke-WebRequest -UseBasicParsing $nugetpkg -OutFile $zipfile
+        }
+        else
+        {
+            curl.exe -L $nugetpkg -o $zipfile
+        }
+        if (!(Test-Path $zipfile))
+        {
+            Log ("Couldn't download: '" + $zipfile + "'") Red
+            exit 1
+        }
 
-    Log ("Extracting: '" + $zipfilepath + "' -> '" + $env:temp + "'")
-    $shell = New-Object -com Shell.Application
-    $shell.Namespace($env:temp).CopyHere($zipfilepath, 20)
+        Log ("Extracting: '" + $zipfilepath + "' -> '" + $env:temp + "'")
+        $shell = New-Object -com Shell.Application
+        $shell.Namespace($env:temp).CopyHere($zipfilepath, 20)
 
-    if (!(Test-Path $dllfilepath))
-    {
-        Log ("Couldn't extract: '" + $dllfilepath + "'") Red
-        exit 1
+        if (!(Test-Path $dllfilepath))
+        {
+            Log ("Couldn't extract: '" + $dllfilepath + "'") Red
+            exit 1
+        }
+
+        Log ("Deleting file: '" + $zipfile + "'")
+        del $zipfile
     }
-
-    Log ("Deleting file: '" + $zipfile + "'")
-    del $zipfile
 
     Log ("Loading assembly: '" + $dllfilepath + "'")
     [Reflection.Assembly]::LoadFile($dllfilepath) | Out-Null
@@ -63,9 +75,32 @@ function Pretty-JsonFile([string] $filename)
 {
     Log ("Reading: '" + $filename + "'") Magenta
     [string] $content = [IO.File]::ReadAllText($filename)
+    [string[]] $rows = [IO.File]::ReadAllLines($filename)
 
     Log ("Prettifying: '" + $filename + "'") Magenta
-    [string] $pretty = [Newtonsoft.Json.Linq.JToken]::Parse($content).ToString([Newtonsoft.Json.Formatting]::Indented)
+
+    $json = $null
+    for ([int] $headers=0; !$json -and $headers -lt $rows.Count; )
+    {
+        [string] $body = ($rows | select -Skip $headers) -join "`r`n"
+        try
+        {
+            $json = [Newtonsoft.Json.Linq.JToken]::Parse($body)
+        }
+        catch
+        {
+            $headers++
+        }
+    }
+    if (!$json)
+    {
+        Log ("Couldn't parse file.") Yellow
+        return
+    }
+
+    Log ("Ignoring " + $headers + " header rows.")
+    [string] $pretty = (($rows | select -First $headers) -join "`r`n") + "`r`n" + $json.ToString([Newtonsoft.Json.Formatting]::Indented)
+
 
     if ($pretty -ne $content)
     {
