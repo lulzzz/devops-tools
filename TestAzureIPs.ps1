@@ -19,7 +19,7 @@ function Main()
 
     Log ("Retrieving ip addresses...")
     $ips = @(Get-AzureRmSubscription | % {
-        [string] $subscriptionName = $_.SubscriptionName
+        [string] $subscriptionName = $_.Name
         Set-AzureRmContext -SubscriptionName $subscriptionName | Out-Null
         Get-AzureRmPublicIpAddress | % {
             $IPAddress = $_
